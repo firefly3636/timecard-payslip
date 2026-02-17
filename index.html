@@ -1,0 +1,4167 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>タイムカード・給与明細書システム</title>
+  <style>
+    @media print {
+      @page { size: A4; margin: 10mm; }
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        padding: 0;
+        margin: 0;
+        max-width: none;
+      }
+      .no-print { display: none !important; }
+      .payslip-only { display: block !important; }
+      body.batch-print-mode .payslip-single-wrap { display: none !important; }
+      body.batch-print-mode #batchPrintContainer { display: block !important; }
+      .payslip {
+        width: 100%;
+        max-width: 190mm;
+        margin: 0 auto 0 auto;
+        padding: 8px 10px 10px 10px;
+        box-shadow: none;
+        border: 1px solid #999;
+        page-break-after: always;
+        page-break-inside: avoid;
+        font-size: 11px;
+      }
+      .payslip .header {
+        padding-bottom: 6px;
+        margin-bottom: 10px;
+      }
+      .payslip .header h1 { font-size: 18px; margin: 0 0 4px 0; }
+      .payslip .header .period { font-size: 11px; }
+      .payslip .info-grid { gap: 12px; margin-bottom: 12px; }
+      .payslip .info-block .company { font-size: 13px; }
+      .payslip .info-block .employee { font-size: 12px; }
+      .payslip .info-block .detail { font-size: 11px; }
+      .payslip table { font-size: 10px; }
+      .payslip th, .payslip td { padding: 4px 6px; }
+      .payslip .section-title { padding: 4px 6px; font-size: 11px; margin-top: 8px; }
+      .payslip .section-title:first-of-type { margin-top: 0; }
+      .payslip .total-row td { font-size: 11px; }
+      .payslip .net-pay { font-size: 12px; padding: 8px; margin-top: 10px; }
+      .payslip .net-pay span { font-size: 16px; }
+      .payslip .memo { margin-top: 10px; padding-top: 8px; font-size: 9px; }
+      .payslip .stamp-area { margin-top: 8px; }
+      .payslip .stamp-area table { font-size: 9px; }
+      .payslip-single-wrap .payslip { page-break-after: auto; }
+    }
+    body.batch-print-mode .no-print,
+    body.batch-print-mode .payslip-single-wrap { display: none !important; }
+    body.batch-print-mode #batchPrintContainer { display: block !important; }
+    .batch-print .payslip { page-break-after: always; }
+    .batch-print .payslip:last-child { page-break-after: auto; }
+    .print-target-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .print-target-grid label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      padding: 6px 0;
+    }
+    .print-target-grid input[type="checkbox"] { width: 18px; height: 18px; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Yu Gothic", "Hiragino Sans", "Meiryo", sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px;
+      color: #1a1a1a;
+      background: #f0f2f5;
+    }
+    .panel {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .panel h2 {
+      margin: 0 0 16px 0;
+      font-size: 18px;
+      color: #2c3e50;
+      border-bottom: 2px solid #2c3e50;
+      padding-bottom: 8px;
+    }
+    .input-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+      align-items: end;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .field label {
+      font-size: 13px;
+      color: #555;
+      font-weight: 500;
+    }
+    .field input, .field select {
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .field input:focus, .field select:focus {
+      outline: none;
+      border-color: #2c3e50;
+      box-shadow: 0 0 0 2px rgba(44,62,80,0.15);
+    }
+    .field .hint {
+      font-size: 11px;
+      color: #888;
+    }
+    .employee-form-section { margin-bottom: 20px; }
+    .form-section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #2c3e50;
+      margin: 0 0 10px 0;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #dee2e6;
+    }
+    .payslip {
+      background: #fff;
+      border: 1px solid #ccc;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 32px;
+      margin-bottom: 24px;
+    }
+    .header {
+      text-align: center;
+      border-bottom: 2px solid #333;
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+    .header h1 { font-size: 24px; font-weight: bold; margin: 0 0 8px 0; letter-spacing: 0.1em; }
+    .header .period { font-size: 14px; color: #555; }
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+    .info-block h3 {
+      font-size: 12px; color: #666; margin: 0 0 8px 0; font-weight: normal;
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .info-block .company { font-size: 16px; font-weight: bold; }
+    .info-block .employee { font-size: 15px; }
+    .info-block .detail { font-size: 13px; color: #555; margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { border: 1px solid #ddd; padding: 10px 12px; text-align: left; }
+    th { background: #f8f8f8; font-weight: 600; width: 35%; }
+    .section-title {
+      background: #2c3e50;
+      color: #fff;
+      font-weight: bold;
+      padding: 8px 12px;
+      margin-top: 20px;
+      margin-bottom: 0;
+      font-size: 13px;
+    }
+    .section-title:first-of-type { margin-top: 0; }
+    .amount { text-align: right; font-family: "Consolas", "MS Gothic", monospace; }
+    .total-row th, .total-row td { font-weight: bold; background: #f0f7ff; font-size: 15px; }
+    .net-pay {
+      font-size: 18px; color: #1a5490; text-align: right; padding: 16px;
+      border: 2px solid #1a5490; margin-top: 20px; background: #f8fbff;
+    }
+    .net-pay span { font-size: 24px; }
+    .memo {
+      margin-top: 24px; padding-top: 16px; border-top: 1px dashed #ccc;
+      font-size: 12px; color: #666;
+    }
+    .stamp-area {
+      margin-top: 20px;
+    }
+    .stamp-area table {
+      width: auto;
+      margin-left: auto;
+      font-size: 11px;
+    }
+    .stamp-area th, .stamp-area td {
+      border: 1px solid #999;
+      padding: 4px 12px;
+      text-align: center;
+      min-width: 70px;
+    }
+    .stamp-area td {
+      height: 60px;
+      vertical-align: bottom;
+    }
+    .no-print { margin-top: 16px; }
+    .no-print button {
+      background: #2c3e50; color: #fff; border: none;
+      padding: 10px 24px; border-radius: 4px; cursor: pointer; font-size: 14px;
+    }
+    .no-print button:hover { background: #34495e; }
+    .calc-badge {
+      display: inline-block;
+      font-size: 11px;
+      color: #2c3e50;
+      background: #e8ecf1;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 4px;
+    }
+    .settings-section { margin-bottom: 20px; }
+    .settings-section:last-child { margin-bottom: 0; }
+    .settings-section h3 {
+      font-size: 14px;
+      color: #444;
+      margin: 0 0 12px 0;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #eee;
+    }
+    .toggle-settings {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      color: #495057;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      margin-bottom: 12px;
+      width: 100%;
+      text-align: left;
+    }
+    .toggle-settings:hover { background: #e9ecef; }
+    .toggle-settings::after { content: ' ▼'; font-size: 10px; }
+    .toggle-settings.open::after { content: ' ▲'; }
+    .settings-content { display: none; }
+    .settings-content.open { display: block; }
+    .btn-reset {
+      background: #6c757d;
+      color: #fff;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      margin-left: 8px;
+    }
+    .btn-reset:hover { background: #5a6268; }
+    .btn-export {
+      background: #28a745;
+      color: #fff;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn-export:hover { background: #218838; }
+    .btn-import {
+      background: #17a2b8;
+      color: #fff;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn-import:hover { background: #138496; }
+    .btn-danger {
+      background: #dc3545;
+      color: #fff;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .btn-danger:hover { background: #c82333; }
+    .help-panel { border-left: 4px solid #1a5490; }
+    .help-panel h2 { color: #1a5490; border-color: #1a5490; }
+    .help-content { display: none; }
+    .help-content.open { display: block; }
+    .help-content ol { margin: 0 0 0 1.2em; padding: 0; }
+    .help-content li { margin-bottom: 10px; line-height: 1.6; }
+    .help-content h4 { margin: 16px 0 6px 0; font-size: 14px; color: #333; }
+    .help-content h4:first-child { margin-top: 0; }
+    .help-content p { margin: 0 0 8px 0; font-size: 13px; color: #555; }
+    .help-content ul { margin: 4px 0 0 1.2em; padding: 0; font-size: 13px; color: #555; }
+    .help-content code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+    .data-panel { border-left: 4px solid #28a745; }
+    .data-panel h2 { color: #28a745; border-color: #28a745; }
+    .note-box {
+      background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px;
+      padding: 10px 14px; margin-bottom: 12px; font-size: 12px; color: #856404;
+    }
+    .validation-warn {
+      color: #dc3545;
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+    .footer-info {
+      text-align: center;
+      padding: 20px 0;
+      font-size: 11px;
+      color: #999;
+    }
+    @media screen and (max-width: 600px) {
+      body { padding: 10px; }
+      .panel { padding: 14px; }
+      .input-grid { grid-template-columns: 1fr; gap: 10px; }
+      .info-grid { grid-template-columns: 1fr; gap: 12px; }
+      .payslip { padding: 16px; }
+      .header h1 { font-size: 18px; }
+      .net-pay { font-size: 14px; }
+      .net-pay span { font-size: 18px; }
+      th { width: 40%; }
+    }
+    .tab-container {
+      margin-bottom: 20px;
+      border-bottom: 2px solid #2c3e50;
+    }
+    .tab-buttons {
+      display: flex;
+      gap: 0;
+      background: #f8f9fa;
+      border-radius: 8px 8px 0 0;
+    }
+    .tab-button {
+      flex: 1;
+      padding: 14px 20px;
+      background: #e9ecef;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+      color: #495057;
+      transition: all 0.3s;
+    }
+    .tab-button:hover {
+      background: #dee2e6;
+    }
+    .tab-button.active {
+      background: #fff;
+      color: #2c3e50;
+      border-bottom-color: #2c3e50;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .timecard-panel {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .timecard-display {
+      text-align: center;
+      padding: 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      border-radius: 12px;
+      margin-bottom: 24px;
+    }
+    .timecard-display .date {
+      font-size: 18px;
+      margin-bottom: 16px;
+      opacity: 0.9;
+    }
+    .timecard-display .time {
+      font-size: 48px;
+      font-weight: bold;
+      font-family: "Consolas", "MS Gothic", monospace;
+      margin-bottom: 8px;
+    }
+    .timecard-display .status {
+      font-size: 16px;
+      opacity: 0.9;
+    }
+    #timecardEmployeeSelect {
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.5);
+      border-radius: 8px;
+      padding: 8px 32px 8px 16px;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='white' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      min-width: 160px;
+      text-align: center;
+      text-align-last: center;
+    }
+    #timecardEmployeeSelect:focus {
+      outline: none;
+      background-color: rgba(255,255,255,0.3);
+      border-color: rgba(255,255,255,0.8);
+    }
+    #timecardEmployeeSelect option {
+      color: #333;
+      background: #fff;
+      font-size: 16px;
+      padding: 8px;
+    }
+    #timecardStatusMsg {
+      margin-top: 6px;
+      font-size: 14px;
+      min-height: 20px;
+    }
+    .timecard-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .timecard-btn {
+      padding: 16px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .timecard-btn.clock-in {
+      background: #28a745;
+      color: #fff;
+    }
+    .timecard-btn.clock-in:hover {
+      background: #218838;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(40,167,69,0.3);
+    }
+    .timecard-btn.clock-out {
+      background: #dc3545;
+      color: #fff;
+    }
+    .timecard-btn.clock-out:hover {
+      background: #c82333;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(220,53,69,0.3);
+    }
+    .timecard-btn.break-start {
+      background: #17a2b8;
+      color: #fff;
+    }
+    .timecard-btn.break-start:hover {
+      background: #138496;
+    }
+    .timecard-btn.break-end {
+      background: #6c757d;
+      color: #fff;
+    }
+    .timecard-btn.break-end:hover {
+      background: #5a6268;
+    }
+    .timecard-records {
+      margin-top: 24px;
+    }
+    .timecard-record {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+    .timecard-record .record-time {
+      font-family: "Consolas", "MS Gothic", monospace;
+      font-weight: 600;
+      color: #2c3e50;
+    }
+    .timecard-record .record-type {
+      font-size: 13px;
+      color: #6c757d;
+    }
+    .timecard-record .record-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .timecard-record .btn-edit,
+    .timecard-record .btn-delete {
+      padding: 4px 12px;
+      font-size: 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .timecard-record .btn-edit {
+      background: #17a2b8;
+      color: #fff;
+    }
+    .timecard-record .btn-edit:hover {
+      background: #138496;
+    }
+    .timecard-record .btn-delete {
+      background: #dc3545;
+      color: #fff;
+    }
+    .timecard-record .btn-delete:hover {
+      background: #c82333;
+    }
+    .timecard-record.editing {
+      background: #fff3cd;
+      border-color: #ffc107;
+    }
+    .timecard-record .time-input {
+      font-family: "Consolas", "MS Gothic", monospace;
+      font-size: 14px;
+      padding: 4px 8px;
+      border: 1px solid #2c3e50;
+      border-radius: 4px;
+      width: 80px;
+    }
+    .timecard-record .btn-save,
+    .timecard-record .btn-cancel {
+      padding: 4px 12px;
+      font-size: 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .timecard-record .btn-save {
+      background: #28a745;
+      color: #fff;
+    }
+    .timecard-record .btn-save:hover {
+      background: #218838;
+    }
+    .timecard-record .btn-cancel {
+      background: #6c757d;
+      color: #fff;
+    }
+    .timecard-record .btn-cancel:hover {
+      background: #5a6268;
+    }
+    .timecard-summary {
+      background: #f0f7ff;
+      border: 2px solid #1a5490;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 24px;
+    }
+    .timecard-summary h3 {
+      margin: 0 0 16px 0;
+      color: #1a5490;
+      font-size: 18px;
+    }
+    .timecard-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 16px;
+    }
+    .summary-item {
+      text-align: center;
+    }
+    .summary-item .label {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    .summary-item .value {
+      font-size: 20px;
+      font-weight: bold;
+      color: #1a5490;
+      font-family: "Consolas", "MS Gothic", monospace;
+    }
+    .monthly-work-list {
+      margin-top: 16px;
+      overflow-x: auto;
+    }
+    .monthly-work-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 13px;
+      table-layout: fixed;
+    }
+    .monthly-work-table th {
+      background: #1a5490;
+      color: #fff;
+      padding: 10px 6px;
+      text-align: center;
+      font-weight: 600;
+      border: 1px solid #0d3d6b;
+      white-space: nowrap;
+    }
+    .monthly-work-table th:nth-child(1) { width: 8%; }  /* 日付 */
+    .monthly-work-table th:nth-child(2) { width: 7%; }  /* 曜日 */
+    .monthly-work-table th:nth-child(3) { width: 15%; } /* 出勤時刻 */
+    .monthly-work-table th:nth-child(4) { width: 15%; } /* 退勤時刻 */
+    .monthly-work-table th:nth-child(5) { width: 15%; } /* 休憩時間 */
+    .monthly-work-table th:nth-child(6) { width: 15%; } /* 就業時間 */
+    .monthly-work-table th:nth-child(7) { width: 15%; } /* 残業時間 */
+    .monthly-work-table td {
+      padding: 8px 6px;
+      text-align: center;
+      border: 1px solid #dee2e6;
+      vertical-align: top;
+      word-wrap: break-word;
+    }
+    .monthly-work-table td:first-child,
+    .monthly-work-table td:nth-child(2) {
+      white-space: nowrap;
+    }
+    .monthly-work-table .editable-time {
+      cursor: pointer;
+      position: relative;
+      padding: 4px;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+    .monthly-work-table .editable-time:hover {
+      background-color: #e3f2fd;
+    }
+    .monthly-work-table .editable-time.editing {
+      background-color: #fff3cd;
+    }
+    .monthly-work-table .time-edit-btn {
+      font-size: 10px;
+      padding: 2px 6px;
+      margin-left: 4px;
+      background: #17a2b8;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .monthly-work-table .time-edit-btn:hover {
+      background: #138496;
+    }
+    .monthly-work-table .time-input {
+      font-size: 12px;
+      padding: 2px 4px;
+      border: 1px solid #1a5490;
+      border-radius: 3px;
+      width: 60px;
+    }
+    .monthly-work-table tr:nth-child(even) {
+      background: #f8f9fa;
+    }
+    .monthly-work-table tr:hover {
+      background: #e9ecef;
+    }
+    .monthly-work-table .work-hours {
+      font-family: "Consolas", "MS Gothic", monospace;
+      font-weight: 600;
+      color: #1a5490;
+    }
+    .monthly-work-table .overtime-hours {
+      font-family: "Consolas", "MS Gothic", monospace;
+      color: #dc3545;
+      font-weight: 600;
+    }
+    @media screen and (max-width: 600px) {
+      .timecard-buttons {
+        grid-template-columns: 1fr;
+      }
+      .timecard-display .time {
+        font-size: 36px;
+      }
+    }
+
+    /* 管理者権限システム */
+    .admin-only {
+      display: none !important;
+    }
+    .admin-only.admin-visible {
+      display: block !important;
+    }
+    .admin-only-inline.admin-visible {
+      display: inline-block !important;
+    }
+    .admin-only-flex.admin-visible {
+      display: flex !important;
+    }
+    .admin-only-grid.admin-visible {
+      display: grid !important;
+    }
+    #adminPasswordArea {
+      display: none;
+      margin-top: 12px;
+      padding: 12px 16px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    #adminPasswordArea input {
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.5);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 16px;
+      width: 140px;
+      text-align: center;
+    }
+    #adminPasswordArea input::placeholder {
+      color: rgba(255,255,255,0.6);
+    }
+    #adminPasswordArea button {
+      background: rgba(255,255,255,0.25);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.5);
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-left: 8px;
+    }
+    #adminPasswordArea button:hover {
+      background: rgba(255,255,255,0.4);
+    }
+    #adminLogoutBtn {
+      display: none;
+      margin-top: 10px;
+    }
+    #adminLogoutBtn button {
+      background: rgba(220,53,69,0.8);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    #adminLogoutBtn button:hover {
+      background: rgba(220,53,69,1);
+    }
+    .admin-badge {
+      display: inline-block;
+      background: #ffc107;
+      color: #333;
+      font-size: 11px;
+      font-weight: bold;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <!-- タブUI -->
+  <div class="tab-container">
+    <div class="tab-buttons">
+      <button class="tab-button active" onclick="switchTab('timecard')">タイムカード</button>
+      <button class="tab-button admin-only admin-only-inline" onclick="switchTab('payslip')" style="display:none">給与明細書</button>
+      <button class="tab-button admin-only admin-only-inline" onclick="switchTab('settings')" style="display:none">設定</button>
+    </div>
+  </div>
+
+  <!-- タイムカードタブ -->
+  <div id="tab-timecard" class="tab-content active">
+    <div class="timecard-panel">
+      <div class="timecard-display">
+        <div class="date" id="timecardDate"></div>
+        <div class="time" id="timecardTime"></div>
+        <div class="status">
+          <select id="timecardEmployeeSelect"></select>
+          <div id="timecardStatusMsg"></div>
+        </div>
+        <div id="adminPasswordArea">
+          <span style="font-size:13px; opacity:0.9;">管理者パスワード</span><br style="margin-bottom:6px;">
+          <input type="password" id="adminPasswordInput" placeholder="パスワード" onkeydown="if(event.key==='Enter')attemptAdminLogin()">
+          <button onclick="attemptAdminLogin()">解錠</button>
+        </div>
+        <div id="adminLogoutBtn">
+          <button onclick="adminLogout()">管理者モード終了</button>
+        </div>
+      </div>
+
+      <div class="timecard-buttons">
+        <button class="timecard-btn clock-in" onclick="clockIn()">出勤</button>
+        <button class="timecard-btn clock-out" onclick="clockOut()">退勤</button>
+        <button class="timecard-btn break-start" onclick="breakStart()">休憩開始</button>
+        <button class="timecard-btn break-end" onclick="breakEnd()">休憩終了</button>
+      </div>
+
+      <div class="panel admin-only">
+        <h3>休憩時間設定</h3>
+        <div class="input-grid">
+          <div class="field">
+            <label>休憩時間の設定方法</label>
+            <select id="breakTimeMode" onchange="updateBreakTimeMode()">
+              <option value="manual">手動入力（打刻）</option>
+              <option value="fixed">固定値</option>
+              <option value="auto">自動計算（労働基準法準拠）</option>
+            </select>
+          </div>
+          <div class="field" id="breakTimeFixedField" style="display:none;">
+            <label>固定休憩時間（分）</label>
+            <input type="number" id="breakTimeFixed" min="0" max="120" value="45" step="5">
+            <span class="hint">一律の休憩時間を設定</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>本日の記録</h3>
+        <div id="todayRecords" class="timecard-records"></div>
+      </div>
+
+      <div class="timecard-summary">
+        <h3>本日の集計</h3>
+        <div class="timecard-summary-grid">
+          <div class="summary-item">
+            <div class="label">就業時間</div>
+            <div class="value" id="todayWorkHours">0時間0分</div>
+          </div>
+          <div class="summary-item">
+            <div class="label">休憩時間</div>
+            <div class="value" id="todayBreakTime">0分</div>
+          </div>
+          <div class="summary-item" id="todayOvertimeItem" style="display:none;">
+            <div class="label">残業時間</div>
+            <div class="value" id="todayOvertimeHours">0時間0分</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel admin-only">
+        <h3>今月の集計</h3>
+        <div class="timecard-summary-grid">
+          <div class="summary-item">
+            <div class="label">合計就業時間</div>
+            <div class="value" id="monthWorkHours">0時間0分</div>
+          </div>
+          <div class="summary-item">
+            <div class="label">出勤日数</div>
+            <div class="value" id="monthWorkDays">0日</div>
+          </div>
+          <div class="summary-item" id="monthOvertimeItem" style="display:none;">
+            <div class="label">合計残業時間</div>
+            <div class="value" id="monthOvertimeHours">0時間0分</div>
+          </div>
+        </div>
+        <div style="margin-top:16px;">
+          <button type="button" onclick="syncToPayslip()" class="btn-export">給与明細書に反映</button>
+        </div>
+      </div>
+
+      <div class="panel admin-only">
+        <h3>月間勤務一覧</h3>
+        <div id="monthlyWorkList" class="monthly-work-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 給与明細書タブ -->
+  <div id="tab-payslip" class="tab-content" style="display:none">
+  <!-- 使い方 -->
+  <div class="panel no-print help-panel">
+    <h2>使い方</h2>
+    <button type="button" class="toggle-settings" id="btnToggleHelp" onclick="toggleHelp()">使い方を開く／閉じる</button>
+    <div class="help-content" id="helpContent">
+      <h4>1. ファイルを開く</h4>
+      <p>この <code>給与明細書.html</code> をブラウザ（Chrome、Edge、Safari など）で開きます。ダブルクリックで開けます。</p>
+
+      <h4>2. 制度・税率の設定（必要に応じて）</h4>
+      <p>画面上部の「制度・税率・有給条件の設定」で、次のような変更ができます。</p>
+      <ul>
+        <li><strong>健康保険料率・厚生年金料率</strong> … 全額の料率を入力。<strong>従業員負担は自動で半額（労使折半）</strong>で計算されます。</li>
+        <li><strong>介護保険料率</strong> … 40歳以上65歳未満の従業員に適用。生年月日を入力すると自動判定されます。</li>
+        <li><strong>雇用保険料率</strong> … 労働者負担分の料率。</li>
+        <li><strong>残業割増率</strong> … 125%＝25%割増（通常残業）。深夜・休日は別途設定。</li>
+        <li><strong>深夜残業割増率</strong> … 150%＝50%割増（22時～翌5時）。</li>
+        <li><strong>法定休日割増率</strong> … 135%＝35%割増（法定休日出勤）。</li>
+        <li><strong>基礎控除</strong> … 所得税の基礎控除額（年額）。</li>
+        <li><strong>有給残日数上限・欠勤自動充当</strong></li>
+      </ul>
+      <p>変更するとすぐに給与明細に反映され、設定はブラウザに自動保存されます。</p>
+
+      <h4>3. 社員を選んでから入力</h4>
+      <p>「シフト管理・給与設定」で<strong>社員を選択</strong>すると、<strong>その社員の設定がひとつの画面にまとめて表示</strong>されます。</p>
+      <ul>
+        <li><strong>基本情報</strong> … 氏名・番号・所属・入社日・生年月日・有給残日数（月初）・扶養親族等の数・勤務先</li>
+        <li><strong>社会保険・雇用保険の適用</strong> … パート・アルバイト等で未加入の場合「適用しない」を選択</li>
+        <li><strong>甲欄・乙欄</strong> … 主たる勤務先なら甲欄、副業先なら乙欄を選択</li>
+        <li><strong>給与・手当（月額）</strong> … 月給・時給・通勤手当・役職手当・住民税・その他手当</li>
+        <li><strong>今月の勤怠・明細</strong> … 所定労働日数・出勤日数・1日の所定労働時間・勤務時間・深夜残業時間・法定休日出勤時間・その他控除</li>
+        <li><strong>振込先情報</strong> … 銀行名・支店名・口座種別・口座番号・口座名義</li>
+      </ul>
+      <p>入力や変更をしたら<strong>「保存（この社員の設定を反映）」</strong>を押すと、その社員のデータが保存され、給与明細に反映されます。</p>
+
+      <h4>4. 自動計算される内容</h4>
+      <p>上記を入力すると、次のものが自動で計算され、その下の「給与明細書」に表示されます。</p>
+      <ul>
+        <li><strong>勤怠</strong> … 欠勤日数、有給消化日数、無給欠勤日数、勤務時間・残業時間、有給残（月末）</li>
+        <li><strong>支給</strong> … 基本給（日割り・有給含む）、通勤手当、残業手当、深夜残業手当、休日出勤手当、役職手当、その他手当、支給合計</li>
+        <li><strong>控除</strong> … 健康保険（折半）、介護保険（40歳以上・折半）、厚生年金（折半）、雇用保険、所得税（復興特別所得税含む）、住民税、その他控除、控除合計</li>
+        <li><strong>差引支給額（手取額）</strong></li>
+      </ul>
+      <p>数値を変えるたびに、すぐに再計算されます。社会保険料は<strong>労使折半</strong>で従業員負担分のみ計算されます。所得税は<strong>源泉徴収税額表（月額表・甲欄/乙欄・電算機計算の特例）</strong>に準拠し、<strong>復興特別所得税2.1%</strong>を含みます。<strong>課税対象額</strong>も給与明細に表示されます。</p>
+
+      <h4>5. 印刷する</h4>
+      <p><strong>1名分だけ印刷</strong>：「給与明細を印刷」ボタン、または <strong>Ctrl + P</strong>。入力欄は印刷されず、選択中の社員の給与明細だけが印刷されます。受領印欄も自動で表示されます。</p>
+      <p><strong>まとめて印刷</strong>：「印刷対象を選択」で印刷する社員にチェックを入れ、「明細書をまとめて印刷」を押すと選択した社員分が順に印刷されます。</p>
+
+      <h4>6. 社員・勤務先を変更する</h4>
+      <p><strong>勤務地の管理</strong>：「勤務地一覧」パネルで勤務地を登録・編集・削除できます。</p>
+      <p><strong>社員の追加</strong>：「＋ 社員を追加」ボタンで社員を追加できます。</p>
+      <p><strong>社員の削除・復元</strong>：「この社員を一覧から削除」で非表示に。「削除した社員の管理・復元」で復元できます。</p>
+
+      <h4>7. データのバックアップ・復元</h4>
+      <p>「データ管理」パネルで<strong>エクスポート</strong>すると、すべてのデータがJSONファイルとしてダウンロードされます。<strong>インポート</strong>で復元できます。PCの買い替えやブラウザの変更時に便利です。</p>
+
+      <h4>8. 甲欄・乙欄の選択</h4>
+      <p>従業員ごとに源泉徴収の「<strong>甲欄</strong>」「<strong>乙欄</strong>」を選択できます。</p>
+      <ul>
+        <li><strong>甲欄</strong>（通常）… 扶養控除等申告書を提出した主たる勤務先。扶養人数に応じた控除あり。</li>
+        <li><strong>乙欄</strong>（副業等）… 2か所目以降の勤務先。扶養控除なし・税率が高い。</li>
+      </ul>
+
+      <h4>9. 計算の注意事項</h4>
+      <ul>
+        <li><strong>社会保険料：</strong>実際には<strong>標準報酬月額</strong>に基づいて計算されますが、本ツールでは<strong>総支給額×料率÷2</strong>の概算値を使用しています。正確な金額は年金事務所や健康保険組合の料額表をご確認ください。健康保険料率は都道府県により異なります（全国平均10.00%）。</li>
+        <li><strong>所得税：</strong><strong>源泉徴収税額表（月額表・甲欄/乙欄・電算機計算の特例）</strong>に準拠して計算しています。<strong>復興特別所得税2.1%</strong>を含む税率を使用しています。甲欄は扶養控除あり、乙欄は扶養控除なし・高税率です。</li>
+        <li><strong>課税対象額：</strong>（総支給額 − 非課税通勤手当）を給与明細に表示しています。社保控除後の金額が<strong>88,000円以下</strong>（甲欄・扶養0人の場合）は<strong>非課税</strong>です。扶養人数が増えると非課税の上限も上がります。</li>
+        <li><strong>通勤手当：</strong>月額<strong>15万円</strong>まで非課税として処理されます。15万円を超える部分は課税対象になります。</li>
+        <li><strong>有給休暇：</strong>労働基準法に基づく段階的な付与日数で計算しています（6ヶ月後10日→1年6ヶ月後11日→…→6年6ヶ月後20日）。</li>
+        <li><strong>残業手当：</strong>通常残業は25%割増、深夜残業（22時～翌5時）は50%割増、法定休日出勤は35%割増です。休日出勤時間は通常残業時間から除外されます。</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 制度・税率・有給条件（リアルタイム反映・保存） -->
+  <div class="panel no-print">
+    <h2>制度・税率・有給条件の設定</h2>
+    <p style="margin:0 0 12px 0; color:#666; font-size:13px;">税率や有給の条件が変わったらここで変更してください。変更はすぐに給与明細に反映され、ブラウザに保存されます。</p>
+    <button type="button" class="toggle-settings" id="btnToggleSettings" onclick="toggleSettings()">税率・有給条件を開く／閉じる</button>
+    <div class="settings-content" id="settingsContent">
+      <div class="note-box">
+        <strong>料率について：</strong><br>
+        • 健康保険料率・厚生年金料率・介護保険料率は<strong>全額</strong>（労使合計）を入力してください。<strong>従業員負担は自動で半額（折半）</strong>で計算されます。<br>
+        • 健康保険料率は都道府県により異なります（全国平均10.00%）。実際の料率は健康保険組合や協会けんぽの料額表をご確認ください。<br>
+        • <strong>令和7年（2025年）の変更：</strong>介護保険料率は3月分から1.59%、雇用保険料率は4月1日以降0.55%に変更されました。
+      </div>
+      <div class="input-grid">
+        <div class="field">
+          <label>健康保険料率（%・全額）</label>
+          <input type="number" id="rateHealth" min="0" max="20" step="0.01" value="10.00">
+          <span class="hint">協会けんぽ全国平均10.00%（都道府県により9.44%～10.78%）。従業員負担は半額</span>
+        </div>
+        <div class="field">
+          <label>介護保険料率（%・全額）</label>
+          <input type="number" id="rateNursingCare" min="0" max="5" step="0.01" value="1.59">
+          <span class="hint">40歳以上65歳未満に適用。従業員負担は半額。令和7年3月分から1.59%</span>
+        </div>
+        <div class="field">
+          <label>厚生年金保険料率（%・全額）</label>
+          <input type="number" id="ratePension" min="0" max="25" step="0.01" value="18.30">
+          <span class="hint">全額。従業員負担は半額（9.15%）</span>
+        </div>
+        <div class="field">
+          <label>雇用保険料率（%・労働者負担）</label>
+          <input type="number" id="rateEmployment" min="0" max="2" step="0.01" value="0.55">
+          <span class="hint">一般の事業 労働者負担分。令和7年4月1日以降0.55%</span>
+        </div>
+        <div class="field">
+          <label>残業割増率（%）</label>
+          <input type="number" id="rateOvertime" min="100" max="200" step="5" value="125">
+          <span class="hint">通常残業：125%＝25%割増</span>
+        </div>
+        <div class="field">
+          <label>深夜残業割増率（%）</label>
+          <input type="number" id="rateNightOvertime" min="100" max="200" step="5" value="150">
+          <span class="hint">22時～翌5時：150%＝50%割増</span>
+        </div>
+        <div class="field">
+          <label>法定休日割増率（%）</label>
+          <input type="number" id="rateHolidayWork" min="100" max="200" step="5" value="135">
+          <span class="hint">法定休日出勤：135%＝35%割増</span>
+        </div>
+        <div class="field">
+          <label>基礎控除（参考・年額）</label>
+          <input type="number" id="incomeTaxBasicDeduction" min="0" value="480000" step="10000" readonly style="background:#eee;">
+          <span class="hint">源泉徴収税額表に月額40,000円で組込み済</span>
+        </div>
+        <div class="field">
+          <label>有給残日数上限（日）</label>
+          <input type="number" id="paidLeaveMax" min="0" max="100" value="40" step="1">
+          <span class="hint">消化計算時の上限（法律上は40日等）</span>
+        </div>
+        <div class="field">
+          <label>有給：欠勤を自動充当</label>
+          <select id="paidLeaveAutoUse">
+            <option value="1">する（欠勤を有給で充当）</option>
+            <option value="0">しない（手動で有給残のみ反映）</option>
+          </select>
+          <span class="hint">「する」で欠勤分を有給から自動消化</span>
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <button type="button" class="btn-reset" onclick="resetRatesToDefault()">税率・有給を初期値に戻す</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 勤務地一覧 -->
+  <div class="panel no-print">
+    <h2>勤務地一覧</h2>
+    <p style="margin:0 0 12px 0; color:#666; font-size:13px;">勤務地を登録・管理します。各社員の「基本情報」で一覧から選択できます。</p>
+    <button type="button" class="toggle-settings" id="btnToggleWorkplace" onclick="toggleWorkplace()">勤務地を管理</button>
+    <div class="settings-content" id="workplaceContent" style="display:none;">
+      <div id="workplaceListContainer"></div>
+      <div style="margin-top:12px; padding-top:12px; border-top:1px solid #eee;">
+        <p style="margin:0 0 8px 0; font-size:13px; font-weight:600; color:#2c3e50;">新しい勤務地を追加</p>
+        <div class="input-grid">
+          <div class="field">
+            <label>会社名</label>
+            <input type="text" id="newWorkplaceName" placeholder="例: 株式会社ABC">
+          </div>
+          <div class="field">
+            <label>住所</label>
+            <input type="text" id="newWorkplaceAddress" placeholder="例: 〒xxx-xxxx …">
+          </div>
+        </div>
+        <button type="button" onclick="addWorkplace()" style="margin-top:8px;">＋ 勤務地を追加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- シフト・給与設定（入力エリア） -->
+  <div class="panel no-print">
+    <h2>シフト管理・給与設定</h2>
+    <p style="margin:0 0 12px 0; color:#666; font-size:13px;">社員を選ぶと、その人の設定が一覧で表示されます。入力後「保存」で反映されます。</p>
+    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+      <div class="field" style="margin:0; min-width:200px;">
+        <label><strong>社員を選択</strong></label>
+        <select id="employeeSelect" style="padding:10px 12px; font-size:14px;"></select>
+      </div>
+      <button type="button" class="btn-reset" onclick="addNewEmployee()">＋ 社員を追加</button>
+    </div>
+    <div id="currentEmployeeLabel" style="margin-bottom:16px; padding:10px 14px; background:#e8f4fd; border-radius:6px; border:1px solid #b8daff; font-size:14px; font-weight:600; color:#0c5460;">
+      現在の設定対象: <span id="currentEmployeeName">—</span> さん
+    </div>
+
+    <div class="employee-form-section">
+      <h3 class="form-section-title">基本情報</h3>
+      <div class="input-grid">
+        <div class="field">
+          <label>氏名</label>
+          <input type="text" id="editEmpName" placeholder="例: 山田 太郎">
+        </div>
+        <div class="field">
+          <label>従業員番号</label>
+          <input type="text" id="editEmpNo" placeholder="例: 00001">
+        </div>
+        <div class="field">
+          <label>所属</label>
+          <input type="text" id="editEmpDept" placeholder="例: 総務部">
+        </div>
+        <div class="field">
+          <label>入社日</label>
+          <input type="date" id="editEmpHireDate">
+          <span class="hint">有給付与日数と連動</span>
+        </div>
+        <div class="field">
+          <label>生年月日</label>
+          <input type="date" id="editEmpBirthDate">
+          <span class="hint">介護保険（40歳以上）の自動判定に使用</span>
+        </div>
+        <div class="field">
+          <label>有給付与日数（入社日から自動）</label>
+          <input type="text" id="editEmpPaidLeaveAuto" readonly style="background:#eee;">
+        </div>
+        <div class="field">
+          <label>有給残日数（月初）</label>
+          <input type="number" id="paidLeaveBalance" min="0" max="100" value="10" step="1">
+          <span class="hint">当月の有給残。消化は自動計算</span>
+        </div>
+        <div class="field">
+          <label>扶養親族等の数</label>
+          <input type="number" id="editDependentCount" min="0" max="10" value="0" step="1">
+          <span class="hint">源泉徴収の甲欄に使用。0人なら88,000円以下非課税</span>
+        </div>
+        <div class="field" style="grid-column:1/-1;">
+          <label>勤務先</label>
+          <select id="editEmpWorkplace" style="padding:8px 10px; font-size:14px;"></select>
+          <span class="hint">「勤務地一覧」パネルで勤務地の追加・編集ができます</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="employee-form-section">
+      <h3 class="form-section-title">社会保険・雇用保険の適用</h3>
+      <div class="note-box">パート・アルバイトなど社会保険に加入していない方は「適用しない」を選んでください。非適用の場合、該当する保険料は控除されません。</div>
+      <div class="input-grid">
+        <div class="field">
+          <label>社会保険（健康保険・厚生年金・介護保険）</label>
+          <select id="editSocialInsurance">
+            <option value="1">適用する</option>
+            <option value="0">適用しない</option>
+          </select>
+          <span class="hint">パート等で未加入の場合は「適用しない」</span>
+        </div>
+        <div class="field">
+          <label>雇用保険</label>
+          <select id="editEmploymentInsurance">
+            <option value="1">適用する</option>
+            <option value="0">適用しない</option>
+          </select>
+          <span class="hint">週20時間未満等で未加入の場合は「適用しない」</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="employee-form-section">
+      <h3 class="form-section-title">源泉徴収の欄区分</h3>
+      <div class="note-box">主たる勤務先（扶養控除等申告書提出先）は「<strong>甲欄</strong>」、2か所目以降・副業は「<strong>乙欄</strong>」を選択してください。乙欄は扶養控除なし・税率が高くなります。</div>
+      <div class="input-grid">
+        <div class="field">
+          <label>源泉徴収 欄区分</label>
+          <select id="editTaxColumn">
+            <option value="kou">甲欄（主たる勤務先）</option>
+            <option value="otsu">乙欄（副業・2か所目以降）</option>
+          </select>
+          <span class="hint">甲欄：扶養控除あり。乙欄：一律高税率</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="employee-form-section">
+      <h3 class="form-section-title">給与・手当（月額）</h3>
+      <div class="input-grid">
+        <div class="field">
+          <label>月給（基本給）</label>
+          <input type="number" id="baseSalary" min="0" value="280000" step="1000">
+        </div>
+        <div class="field">
+          <label>時給（円/時）</label>
+          <input type="number" id="hourlyWage" min="0" step="10" placeholder="空なら月給から換算">
+          <span class="hint">時給制は月給0で時給のみ。勤務時間は15分単位</span>
+        </div>
+        <div class="field">
+          <label>通勤手当（日額）</label>
+          <input type="number" id="commuteAllowance" min="0" value="680" step="10">
+          <span class="hint">日額 × 出勤日数で自動計算。月額15万円まで非課税</span>
+        </div>
+        <div class="field">
+          <label>役職手当</label>
+          <input type="number" id="positionAllowance" min="0" value="20000" step="1000">
+        </div>
+        <div class="field">
+          <label>その他手当（月額・円）</label>
+          <input type="number" id="otherAllowance" min="0" value="0" step="1000">
+        </div>
+        <div class="field">
+          <label>その他手当の名目</label>
+          <input type="text" id="otherAllowanceDesc" placeholder="例: 家族手当、住宅手当 等">
+          <span class="hint">給与明細に表示する名称</span>
+        </div>
+        <div class="field">
+          <label>住民税</label>
+          <input type="number" id="residentTax" min="0" value="12000" step="1000">
+          <span class="hint">特別徴収月額</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="employee-form-section">
+      <h3 class="form-section-title">今月の勤怠・明細</h3>
+      <div id="validationWarnings" style="display:none;"></div>
+      <div class="input-grid">
+        <div class="field">
+          <label>所定労働日数（月）</label>
+          <input type="number" id="scheduledDays" min="1" max="31" value="22" step="1">
+        </div>
+        <div class="field">
+          <label>出勤日数</label>
+          <input type="number" id="workedDays" min="0" max="31" value="20" step="1">
+        </div>
+        <div class="field">
+          <label>1日の所定労働時間</label>
+          <input type="number" id="dailyScheduledHours" min="1" max="12" value="8" step="0.5">
+          <span class="hint">通常8時間。パート等は短縮可</span>
+        </div>
+        <div class="field">
+          <label>勤務時間（総労働時間）</label>
+          <input type="number" id="workedHours" min="0" max="400" value="176" step="0.25">
+          <span class="hint">15分単位（0.25時間刻み）。残業は自動計算</span>
+        </div>
+        <div class="field">
+          <label>うち深夜残業時間</label>
+          <input type="number" id="nightOvertimeHours" min="0" max="200" value="0" step="0.25">
+          <span class="hint">15分単位。22時～翌5時の労働時間</span>
+        </div>
+        <div class="field">
+          <label>法定休日出勤時間</label>
+          <input type="number" id="holidayWorkHours" min="0" max="200" value="0" step="0.25">
+          <span class="hint">15分単位。法定休日の労働時間</span>
+        </div>
+        <div class="field">
+          <label>その他控除（円）</label>
+          <input type="number" id="otherDeduction" min="0" value="0" step="100">
+        </div>
+        <div class="field">
+          <label>その他控除の名目</label>
+          <input type="text" id="otherDeductionDesc" placeholder="例: 社宅費、組合費 等">
+          <span class="hint">給与明細に表示する名称</span>
+        </div>
+        <div class="field">
+          <label>対象年月</label>
+          <input type="text" id="periodMonth" value="" placeholder="例: 令和7年2月分">
+          <span class="hint">初回は当月が自動セットされます</span>
+        </div>
+        <div class="field">
+          <label>支給日</label>
+          <input type="text" id="payDate" value="" placeholder="例: 令和7年3月15日">
+          <span class="hint">初回は翌月15日が自動セットされます</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="employee-form-section">
+      <h3 class="form-section-title">振込先情報</h3>
+      <div class="input-grid">
+        <div class="field">
+          <label>銀行名</label>
+          <input type="text" id="editBankName" placeholder="例: ○○銀行">
+        </div>
+        <div class="field">
+          <label>支店名</label>
+          <input type="text" id="editBranchName" placeholder="例: △△支店">
+        </div>
+        <div class="field">
+          <label>口座種別</label>
+          <select id="editAccountType">
+            <option value="普通">普通</option>
+            <option value="当座">当座</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>口座番号</label>
+          <input type="text" id="editAccountNumber" placeholder="例: 1234567">
+        </div>
+        <div class="field">
+          <label>口座名義</label>
+          <input type="text" id="editAccountHolder" placeholder="例: ヤマダ タロウ">
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px; padding-top:16px; border-top:1px solid #e9ecef;">
+      <button type="button" onclick="saveCurrentEmployee()">保存（この社員の設定を反映）</button>
+      <button type="button" class="btn-reset" onclick="resetEmployeeMaster()" style="margin-left:8px;">この社員を初期値に戻す</button>
+      <button type="button" class="btn-danger" onclick="deleteCurrentEmployee()" style="margin-left:8px;">この社員を一覧から削除</button>
+    </div>
+
+    <div style="margin-top:16px; padding:12px; background:#f8f9fa; border-radius:6px; border:1px solid #e9ecef;">
+      <button type="button" class="toggle-settings" id="btnToggleDeletedEmployees" onclick="toggleDeletedEmployees()">削除した社員の管理・復元</button>
+      <div class="settings-content" id="deletedEmployeeContent" style="display:none;">
+        <p style="margin:10px 0 8px 0; font-size:13px; color:#555;">一覧から削除した社員です。「復元」で再表示できます。</p>
+        <div id="deletedEmployeeList"></div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <button type="button" onclick="recalculate()">再計算</button>
+      <button type="button" onclick="window.print()" style="margin-left:8px;">給与明細を印刷</button>
+      <button type="button" onclick="printAllPayslips()" style="margin-left:8px;">明細書をまとめて印刷</button>
+    </div>
+    <div style="margin-top:16px; padding-top:12px; border-top:1px solid #eee;">
+      <button type="button" class="toggle-settings" id="btnTogglePrintTarget" onclick="togglePrintTarget()">印刷対象を選択（まとめて印刷する社員）</button>
+      <div class="settings-content" id="printTargetContent" style="display:none;">
+        <p style="margin:0 0 10px 0; font-size:13px; color:#555;">印刷する社員にチェックを入れてください。</p>
+        <div class="print-target-grid" id="printTargetGrid"></div>
+        <div style="margin-top:10px;">
+          <button type="button" class="btn-reset" onclick="setAllPrintTarget(true)">全員選択</button>
+          <button type="button" class="btn-reset" onclick="setAllPrintTarget(false)" style="margin-left:8px;">全員解除</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- データ管理 -->
+  <div class="panel no-print data-panel admin-only">
+    <h2>データ管理（バックアップ・復元）</h2>
+    <p style="margin:0 0 16px 0; color:#666; font-size:13px;">すべてのデータ（社員情報・設定・勤怠）をJSONファイルとしてバックアップ・復元できます。PCの買い替えやブラウザの変更時にお使いください。</p>
+    <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+      <button type="button" class="btn-export" onclick="exportData()">データをエクスポート（バックアップ）</button>
+      <button type="button" class="btn-import" onclick="importData()">データをインポート（復元）</button>
+      <button type="button" class="btn-danger" onclick="clearAllData()">全データを削除</button>
+    </div>
+    <p style="margin:12px 0 0 0; font-size:11px; color:#999;">エクスポートしたJSONファイルは安全な場所に保管してください。インポート時は現在のデータが上書きされます。</p>
+  </div>
+  </div>
+
+  <!-- 設定タブ -->
+  <div id="tab-settings" class="tab-content" style="display:none">
+    <div class="panel">
+      <h2>管理者パスワード変更</h2>
+      <p style="margin:0 0 12px 0; color:#666; font-size:13px;">管理者（寺山茂樹）のログインパスワードを変更できます。初期パスワードは「0000」です。</p>
+      <div class="input-grid">
+        <div class="field">
+          <label>現在のパスワード</label>
+          <input type="password" id="currentAdminPassword" placeholder="現在のパスワード">
+        </div>
+        <div class="field">
+          <label>新しいパスワード</label>
+          <input type="password" id="newAdminPassword" placeholder="新しいパスワード">
+        </div>
+        <div class="field">
+          <label>新しいパスワード（確認）</label>
+          <input type="password" id="confirmAdminPassword" placeholder="もう一度入力">
+        </div>
+      </div>
+      <button type="button" class="btn-save" onclick="changeAdminPassword()" style="margin-top:12px;">パスワードを変更</button>
+    </div>
+    <div class="panel">
+      <h2>タイムカード設定</h2>
+      <div class="input-grid">
+        <div class="field">
+          <label>1日の所定労働時間（時間）</label>
+          <input type="number" id="timecardDailyHours" min="1" max="12" value="8" step="0.5" onchange="updateTimecardSummary()">
+          <span class="hint">残業判定の基準時間</span>
+        </div>
+        <div class="field">
+          <label>所定労働日数（月）</label>
+          <input type="number" id="timecardScheduledDays" min="1" max="31" value="22" step="1">
+          <span class="hint">月間の所定労働日数</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>給与明細書設定</h2>
+      <p style="margin:0 0 12px 0; color:#666; font-size:13px;">給与明細書の税率・制度設定は「給与明細書」タブから設定できます。</p>
+      <button type="button" onclick="switchTab('payslip')" class="btn-export">給与明細書タブに移動</button>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <div class="no-print footer-info">
+    タイムカード・給与明細書システム ver.3.0　|　最終更新：2026年2月16日　|　源泉徴収税額表（月額表・甲欄/乙欄・電算機計算の特例）準拠　|　令和7年度料率対応（介護1.59%・雇用0.55%）
+  </div>
+
+  <!-- まとめて印刷用（通常は非表示） -->
+  <div id="batchPrintContainer" style="display:none;" class="batch-print"></div>
+
+  <!-- 給与明細（自動計算結果を表示） -->
+  <div class="payslip-single-wrap admin-only" style="display:none">
+  <div class="payslip" id="payslip">
+    <div class="header">
+      <h1>給与明細書</h1>
+      <p class="period" id="periodText">令和7年2月分　支給日：令和7年3月15日</p>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-block">
+        <h3>勤務先</h3>
+        <div class="company" id="dispCompanyName">株式会社サンプル</div>
+        <div class="detail" id="dispCompanyAddress">〒100-0001 東京都千代田区千代田1-1</div>
+      </div>
+      <div class="info-block">
+        <h3>従業員</h3>
+        <div class="employee" id="dispEmployeeName">山田 太郎 様</div>
+        <div class="detail" id="dispEmployeeDetail">従業員番号：00001　所属：総務部</div>
+      </div>
+    </div>
+
+    <table>
+      <tr class="section-title"><th colspan="2">勤怠</th></tr>
+      <tr><th>所定労働日数</th><td class="amount" id="dispScheduledDays">22 日</td></tr>
+      <tr><th>出勤日数</th><td class="amount" id="dispWorkedDays">20 日</td></tr>
+      <tr><th>欠勤日数</th><td class="amount" id="dispAbsentDays">0 日</td></tr>
+      <tr><th>有給休暇消化日数</th><td class="amount" id="dispPaidLeaveUsed">0 日</td></tr>
+      <tr><th>無給欠勤日数</th><td class="amount" id="dispUnpaidAbsentDays">0 日</td></tr>
+      <tr><th>勤務時間（総労働時間）</th><td class="amount" id="dispWorkedHours">176.0 時間</td></tr>
+      <tr><th>残業時間</th><td class="amount" id="dispOvertimeHours">0.0 時間</td></tr>
+      <tr id="rowNightOvertimeHours"><th>うち深夜残業時間</th><td class="amount" id="dispNightOvertimeHours">0.0 時間</td></tr>
+      <tr id="rowHolidayWorkHours"><th>法定休日出勤時間</th><td class="amount" id="dispHolidayWorkHours">0.0 時間</td></tr>
+      <tr><th>有給残日数（月末）</th><td class="amount" id="dispPaidLeaveRemain">10 日</td></tr>
+
+      <tr class="section-title"><th colspan="2">支給</th></tr>
+      <tr><th>基本給（日割り・有給含む）</th><td class="amount" id="dispBaseSalary">280,000 円</td></tr>
+      <tr><th>通勤手当（日額 × 出勤日数）</th><td class="amount" id="dispCommute">13,600 円</td></tr>
+      <tr id="rowOvertimePay"><th>残業手当（<span id="dispOvertimeRate">125</span>%）</th><td class="amount" id="dispOvertimePay">0 円</td></tr>
+      <tr id="rowNightOvertimePay"><th>深夜残業手当（<span id="dispNightOvertimeRate">150</span>%）</th><td class="amount" id="dispNightOvertimePay">0 円</td></tr>
+      <tr id="rowHolidayWorkPay"><th>休日出勤手当（<span id="dispHolidayWorkRate">135</span>%）</th><td class="amount" id="dispHolidayWorkPay">0 円</td></tr>
+      <tr id="rowPositionAllowance"><th>役職手当</th><td class="amount" id="dispPosition">20,000 円</td></tr>
+      <tr id="rowOtherAllowance" style="display:none;"><th id="dispOtherAllowanceLabel">その他手当</th><td class="amount" id="dispOtherAllowance">0 円</td></tr>
+      <tr class="total-row"><th>支給合計</th><td class="amount" id="dispGross">346,500 円</td></tr>
+      <tr style="background:#fffde7;"><th>課税対象額（税計算の基礎）</th><td class="amount" id="dispTaxableGross" style="color:#b8860b;">0 円</td></tr>
+
+      <tr class="section-title"><th colspan="2">控除</th></tr>
+      <tr style="background:#f0f7ff;"><th>社保控除後の金額</th><td class="amount" id="dispAfterSI" style="color:#1a5490;">0 円</td></tr>
+      <tr id="rowHealth"><th>健康保険（折半）</th><td class="amount" id="dispHealth">- 0 円</td></tr>
+      <tr id="rowNursingCare" style="display:none;"><th>介護保険（折半）</th><td class="amount" id="dispNursingCare">- 0 円</td></tr>
+      <tr id="rowPension"><th>厚生年金保険（折半）</th><td class="amount" id="dispPension">- 0 円</td></tr>
+      <tr id="rowEmployment"><th>雇用保険</th><td class="amount" id="dispEmployment">- 0 円</td></tr>
+      <tr><th id="dispIncomeTaxLabel">所得税（復興特別所得税含む）</th><td class="amount" id="dispIncomeTax">- 0 円</td></tr>
+      <tr><th>住民税</th><td class="amount" id="dispResidentTax">- 12,000 円</td></tr>
+      <tr id="rowOtherDeduction" style="display:none;"><th id="dispOtherDeductionLabel">その他控除</th><td class="amount" id="dispOtherDeduction">- 0 円</td></tr>
+      <tr class="total-row"><th>控除合計</th><td class="amount" id="dispTotalDeduction">- 0 円</td></tr>
+    </table>
+
+    <div class="net-pay">
+      差引支給額（手取額）　<span id="dispNetPay">0 円</span>
+    </div>
+
+    <div class="memo" id="dispMemo">
+      ※ 振込先：○○銀行 △△支店 普通 1234567 山田太郎<br>
+      ※ ご不明な点は総務部までお問い合わせください。
+    </div>
+
+    <div class="stamp-area">
+      <table>
+        <tr><th>承認</th><th>確認</th><th>受領印</th></tr>
+        <tr><td></td><td></td><td></td></tr>
+      </table>
+    </div>
+  </div>
+  </div>
+
+  <script>
+    // グローバル変数を最初に定義
+    var timecardClockInterval = null;
+    
+    // switchTab関数を最初に定義（HTMLのonclickから呼び出されるため）
+    window.switchTab = function(tabName) {
+      try {
+        if ((tabName === 'payslip' || tabName === 'settings') && !isAdminUnlocked) {
+          return;
+        }
+        // すべてのタブコンテンツを取得
+        var tabTimecard = document.getElementById('tab-timecard');
+        var tabPayslip = document.getElementById('tab-payslip');
+        var tabSettings = document.getElementById('tab-settings');
+        
+        // すべてのタブコンテンツを非表示
+        if (tabTimecard) tabTimecard.style.display = 'none';
+        if (tabPayslip) tabPayslip.style.display = 'none';
+        if (tabSettings) tabSettings.style.display = 'none';
+        
+        if (tabTimecard) tabTimecard.classList.remove('active');
+        if (tabPayslip) tabPayslip.classList.remove('active');
+        if (tabSettings) tabSettings.classList.remove('active');
+        
+        // すべてのタブボタンからactiveクラスを削除
+        var buttons = document.querySelectorAll('.tab-button');
+        for (var i = 0; i < buttons.length; i++) {
+          buttons[i].classList.remove('active');
+        }
+        
+        // 指定されたタブを表示
+        if (tabName === 'timecard' && tabTimecard) {
+          tabTimecard.style.display = 'block';
+          tabTimecard.classList.add('active');
+          if (buttons[0]) buttons[0].classList.add('active');
+          // 時計を開始（直接実装）
+          var dateEl = document.getElementById('timecardDate');
+          var timeEl = document.getElementById('timecardTime');
+          if (dateEl && timeEl) {
+            function updateClock() {
+              var now = new Date();
+              var year = now.getFullYear();
+              var month = now.getMonth() + 1;
+              var day = now.getDate();
+              var hours = now.getHours();
+              var minutes = now.getMinutes();
+              var seconds = now.getSeconds();
+              
+              dateEl.textContent = year + '年' + month + '月' + day + '日';
+              timeEl.textContent = 
+                (hours < 10 ? '0' : '') + hours + ':' + 
+                (minutes < 10 ? '0' : '') + minutes + ':' + 
+                (seconds < 10 ? '0' : '') + seconds;
+            }
+            updateClock();
+            if (window.timecardClockInterval) {
+              clearInterval(window.timecardClockInterval);
+            }
+            window.timecardClockInterval = setInterval(updateClock, 1000);
+          }
+          if (typeof window.loadTodayRecords === 'function') window.loadTodayRecords();
+          if (typeof updateTimecardSummary === 'function') updateTimecardSummary();
+          if (typeof updateMonthlyWorkList === 'function') updateMonthlyWorkList();
+        } else if (tabName === 'payslip' && tabPayslip) {
+          tabPayslip.style.display = 'block';
+          tabPayslip.classList.add('active');
+          if (buttons[1]) buttons[1].classList.add('active');
+        } else if (tabName === 'settings' && tabSettings) {
+          tabSettings.style.display = 'block';
+          tabSettings.classList.add('active');
+          if (buttons[2]) buttons[2].classList.add('active');
+        }
+      } catch (e) {
+        console.error('switchTab error:', e);
+        alert('タブの切り替えでエラーが発生しました: ' + e.message);
+      }
+    };
+    
+    // 時計を開始する関数（確実に動作するように）
+    var lastDisplayedDate = null;
+    function startTimecardClockNow() {
+      var dateEl = document.getElementById('timecardDate');
+      var timeEl = document.getElementById('timecardTime');
+      if (!dateEl || !timeEl) {
+        // 要素が見つからない場合は少し待って再試行
+        setTimeout(startTimecardClockNow, 100);
+        return;
+      }
+      
+      function updateClock() {
+        try {
+          var now = new Date();
+          var year = now.getFullYear();
+          var month = now.getMonth() + 1;
+          var day = now.getDate();
+          var hours = now.getHours();
+          var minutes = now.getMinutes();
+          var seconds = now.getSeconds();
+          
+          var currentDateKey = year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+          
+          // 日付が変わったら本日の記録を更新
+          if (lastDisplayedDate !== null && lastDisplayedDate !== currentDateKey) {
+            if (typeof window.loadTodayRecords === 'function') {
+              window.loadTodayRecords();
+            }
+            if (typeof updateTimecardSummary === 'function') {
+              updateTimecardSummary();
+            }
+            if (typeof updateMonthlyWorkList === 'function') {
+              updateMonthlyWorkList();
+            }
+          }
+          lastDisplayedDate = currentDateKey;
+          
+          dateEl.textContent = year + '年' + month + '月' + day + '日';
+          timeEl.textContent = 
+            (hours < 10 ? '0' : '') + hours + ':' + 
+            (minutes < 10 ? '0' : '') + minutes + ':' + 
+            (seconds < 10 ? '0' : '') + seconds;
+        } catch (e) {
+          console.error('時計更新エラー:', e);
+        }
+      }
+      
+      updateClock();
+      if (window.timecardClockInterval) {
+        clearInterval(window.timecardClockInterval);
+      }
+      window.timecardClockInterval = setInterval(updateClock, 1000);
+    }
+    // グローバルスコープにも公開
+    window.startTimecardClockNow = startTimecardClockNow;
+    
+    var STORAGE_KEY = 'payslip_settings';
+    var STORAGE_KEY_EMPLOYEE_PREFIX = 'payslip_emp_';
+    var STORAGE_KEY_EMPLOYEE_MASTER_PREFIX = 'payslip_emp_master_';
+    var STORAGE_KEY_EMPLOYEE_EXTRA = 'payslip_employee_extra';
+    var STORAGE_KEY_COMPANY = 'payslip_company';
+    var STORAGE_KEY_WORKPLACES = 'payslip_workplaces';
+    var STORAGE_KEY_HIDDEN_EMPLOYEES = 'payslip_hidden_employees';
+    var PRINT_TARGET_KEY = 'payslip_print_target';
+    var STORAGE_KEY_TIMECARD = 'timecard_records';
+    var STORAGE_KEY_TIMECARD_SETTINGS = 'timecard_settings';
+    var ADMIN_PASSWORD_KEY = 'payslip_admin_password';
+    var DEFAULT_ADMIN_PASSWORD = '0000';
+    var ADMIN_NAME = '寺山茂樹';
+    var isAdminUnlocked = false;
+
+    function getAdminPassword() {
+      return localStorage.getItem(ADMIN_PASSWORD_KEY) || DEFAULT_ADMIN_PASSWORD;
+    }
+
+    function isAdminEmployee() {
+      var idx = getSelectedEmployeeIndex();
+      var e = getEmployeeMaster(idx);
+      if (!e || !e.name) return false;
+      var name = e.name.replace(/[\s　]+/g, '');
+      return name === ADMIN_NAME.replace(/[\s　]+/g, '');
+    }
+
+    function updateAdminUI() {
+      var passwordArea = document.getElementById('adminPasswordArea');
+      var logoutBtn = document.getElementById('adminLogoutBtn');
+      var isAdmin = isAdminEmployee();
+
+      if (passwordArea) {
+        passwordArea.style.display = (isAdmin && !isAdminUnlocked) ? 'block' : 'none';
+      }
+      if (logoutBtn) {
+        logoutBtn.style.display = isAdminUnlocked ? 'block' : 'none';
+      }
+
+      var adminElements = document.querySelectorAll('.admin-only');
+      var buttons = document.querySelectorAll('.tab-button');
+      var payslipTab = document.getElementById('tab-payslip');
+      var settingsTab = document.getElementById('tab-settings');
+      var timecardTab = document.getElementById('tab-timecard');
+
+      if (isAdminUnlocked) {
+        for (var i = 0; i < adminElements.length; i++) {
+          adminElements[i].classList.add('admin-visible');
+          adminElements[i].style.display = '';
+        }
+        if (buttons[1]) { buttons[1].style.display = ''; buttons[1].classList.add('admin-visible'); }
+        if (buttons[2]) { buttons[2].style.display = ''; buttons[2].classList.add('admin-visible'); }
+      } else {
+        for (var i = 0; i < adminElements.length; i++) {
+          adminElements[i].classList.remove('admin-visible');
+          adminElements[i].style.display = 'none';
+        }
+        if (buttons[1]) buttons[1].style.display = 'none';
+        if (buttons[2]) buttons[2].style.display = 'none';
+        if (payslipTab) {
+          payslipTab.style.display = 'none';
+          payslipTab.classList.remove('active');
+        }
+        if (settingsTab) {
+          settingsTab.style.display = 'none';
+          settingsTab.classList.remove('active');
+        }
+        if (timecardTab) {
+          timecardTab.style.display = 'block';
+          timecardTab.classList.add('active');
+        }
+        if (buttons[0]) buttons[0].classList.add('active');
+      }
+    }
+
+    function attemptAdminLogin() {
+      var input = document.getElementById('adminPasswordInput');
+      if (!input) return;
+      var password = input.value;
+      if (password === getAdminPassword()) {
+        isAdminUnlocked = true;
+        input.value = '';
+        updateAdminUI();
+        showTimecardStatusTemporary('管理者モードに切り替えました');
+      } else {
+        alert('パスワードが正しくありません。');
+        input.value = '';
+      }
+    }
+
+    function adminLogout() {
+      isAdminUnlocked = false;
+      updateAdminUI();
+      showTimecardStatusTemporary('管理者モードを終了しました');
+    }
+    function changeAdminPassword() {
+      var currentPw = document.getElementById('currentAdminPassword');
+      var newPw = document.getElementById('newAdminPassword');
+      var confirmPw = document.getElementById('confirmAdminPassword');
+      if (!currentPw || !newPw || !confirmPw) return;
+
+      if (currentPw.value !== getAdminPassword()) {
+        alert('現在のパスワードが正しくありません。');
+        return;
+      }
+      if (!newPw.value || newPw.value.length < 1) {
+        alert('新しいパスワードを入力してください。');
+        return;
+      }
+      if (newPw.value !== confirmPw.value) {
+        alert('新しいパスワードが一致しません。');
+        return;
+      }
+      localStorage.setItem(ADMIN_PASSWORD_KEY, newPw.value);
+      currentPw.value = '';
+      newPw.value = '';
+      confirmPw.value = '';
+      alert('パスワードを変更しました。');
+    }
+
+    window.attemptAdminLogin = attemptAdminLogin;
+    window.adminLogout = adminLogout;
+    window.changeAdminPassword = changeAdminPassword;
+
+    var EMPLOYEES = [
+      { name: '山田 太郎',   empNo: '00001', dept: '総務部',   baseSalary: 280000, commute: 680,  position: 20000, residentTax: 12000, paidLeave: 10 },
+      { name: '佐藤 花子',   empNo: '00002', dept: '総務部',   baseSalary: 260000, commute: 550,  position: 0,     residentTax: 10000, paidLeave: 14 },
+      { name: '鈴木 一郎',   empNo: '00003', dept: '営業部',   baseSalary: 300000, commute: 820,  position: 25000, residentTax: 15000, paidLeave: 8 },
+      { name: '高橋 美咲',   empNo: '00004', dept: '営業部',   baseSalary: 270000, commute: 680,  position: 0,     residentTax: 11000, paidLeave: 12 },
+      { name: '田中 健太',   empNo: '00005', dept: '営業部',   baseSalary: 250000, commute: 460,  position: 0,     residentTax: 8000,  paidLeave: 20 },
+      { name: '伊藤 さくら', empNo: '00006', dept: '開発部',   baseSalary: 320000, commute: 910,  position: 30000, residentTax: 18000, paidLeave: 5 },
+      { name: '渡辺 大輔',   empNo: '00007', dept: '開発部',   baseSalary: 290000, commute: 730,  position: 15000, residentTax: 13000, paidLeave: 9 },
+      { name: '中村 優子',   empNo: '00008', dept: '開発部',   baseSalary: 275000, commute: 640,  position: 0,     residentTax: 12000, paidLeave: 11 },
+      { name: '小林 翔太',   empNo: '00009', dept: '開発部',   baseSalary: 265000, commute: 550,  position: 0,     residentTax: 9000,  paidLeave: 15 },
+      { name: '加藤 あゆみ', empNo: '00010', dept: '開発部',   baseSalary: 255000, commute: 460,  position: 0,     residentTax: 7000,  paidLeave: 18 },
+      { name: '吉田 直樹',   empNo: '00011', dept: '人事部',   baseSalary: 285000, commute: 680,  position: 22000, residentTax: 14000, paidLeave: 7 },
+      { name: '山本 恵子',   empNo: '00012', dept: '人事部',   baseSalary: 268000, commute: 590,  position: 0,     residentTax: 10500, paidLeave: 13 },
+      { name: '松本 拓也',   empNo: '00013', dept: '経理部',   baseSalary: 295000, commute: 770,  position: 28000, residentTax: 16000, paidLeave: 6 },
+      { name: '井上 由美',   empNo: '00014', dept: '経理部',   baseSalary: 272000, commute: 640,  position: 0,     residentTax: 11500, paidLeave: 10 },
+      { name: '木村 浩二',   empNo: '00015', dept: '経理部',   baseSalary: 258000, commute: 500,  position: 0,     residentTax: 8500,  paidLeave: 16 },
+      { name: '林 真由美',   empNo: '00016', dept: '企画部',   baseSalary: 310000, commute: 860,  position: 35000, residentTax: 17000, paidLeave: 4 },
+      { name: '斎藤 誠',     empNo: '00017', dept: '企画部',   baseSalary: 278000, commute: 680,  position: 10000, residentTax: 12500, paidLeave: 8 },
+      { name: '清水 麻衣',   empNo: '00018', dept: '営業部',   baseSalary: 262000, commute: 590,  position: 0,     residentTax: 9500,  paidLeave: 14 },
+      { name: '山口 涼太',   empNo: '00019', dept: '総務部',   baseSalary: 248000, commute: 410,  position: 0,     residentTax: 7500,  paidLeave: 19 },
+      { name: '松田 彩香',   empNo: '00020', dept: '開発部',   baseSalary: 268000, commute: 640,  position: 5000,  residentTax: 10000, paidLeave: 12 }
+    ];
+
+    /* ===== ユーティリティ ===== */
+    function num(id) {
+      var el = document.getElementById(id);
+      if (!el) return 0;
+      var n = parseFloat(el.value);
+      return isNaN(n) ? 0 : n;
+    }
+    function str(id) {
+      var el = document.getElementById(id);
+      return el ? el.value.trim() || '' : '';
+    }
+    function setText(id, text) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = text;
+    }
+    function formatHoursMinutes(decimalHours) {
+      var h = Math.floor(decimalHours);
+      var m = Math.round((decimalHours - h) * 60);
+      if (m === 60) { h++; m = 0; }
+      if (m === 0) return h + '時間';
+      return h + '時間' + m + '分';
+    }
+    function setVal(id, val) {
+      var el = document.getElementById(id);
+      if (el) el.value = val;
+    }
+    function toWareki(date) {
+      var y = date.getFullYear();
+      var m = date.getMonth() + 1;
+      var d = date.getDate();
+      var era, ey;
+      if (y >= 2019) { era = '令和'; ey = y - 2018; }
+      else if (y >= 1989) { era = '平成'; ey = y - 1988; }
+      else { era = '昭和'; ey = y - 1925; }
+      return { era: era, year: ey === 1 ? '元' : String(ey), month: m, day: d };
+    }
+    function getDefaultPeriodMonth() {
+      var d = new Date();
+      var w = toWareki(d);
+      return w.era + w.year + '年' + w.month + '月分';
+    }
+    function getDefaultPayDate() {
+      var d = new Date();
+      var next = new Date(d.getFullYear(), d.getMonth() + 1, 15);
+      var w = toWareki(next);
+      return w.era + w.year + '年' + w.month + '月' + w.day + '日';
+    }
+
+    /* ===== 社員リスト管理 ===== */
+    function getEmployeeList() {
+      var extra = [];
+      try { extra = JSON.parse(localStorage.getItem(STORAGE_KEY_EMPLOYEE_EXTRA) || '[]'); } catch (e) {}
+      return EMPLOYEES.concat(extra);
+    }
+    function getHiddenEmployeeIndices() {
+      try { var a = JSON.parse(localStorage.getItem(STORAGE_KEY_HIDDEN_EMPLOYEES) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+    }
+    function setEmployeeHidden(idx, hidden) {
+      var arr = getHiddenEmployeeIndices();
+      var i = arr.indexOf(idx);
+      if (hidden && i === -1) arr.push(idx);
+      if (!hidden && i !== -1) arr.splice(i, 1);
+      try { localStorage.setItem(STORAGE_KEY_HIDDEN_EMPLOYEES, JSON.stringify(arr)); } catch (e) {}
+    }
+    function isEmployeeHidden(idx) {
+      return getHiddenEmployeeIndices().indexOf(idx) !== -1;
+    }
+    function saveEmployeeList(extra) {
+      try { localStorage.setItem(STORAGE_KEY_EMPLOYEE_EXTRA, JSON.stringify(extra)); } catch (e) {}
+    }
+
+    /* ===== 勤務地マスタ管理 ===== */
+    var DEFAULT_WORKPLACES = [
+      { name: '株式会社サンプル', address: '〒100-0001 東京都千代田区千代田1-1' }
+    ];
+    function getWorkplaces() {
+      try {
+        var s = localStorage.getItem(STORAGE_KEY_WORKPLACES);
+        if (s) { var arr = JSON.parse(s); if (Array.isArray(arr) && arr.length > 0) return arr; }
+      } catch (e) {}
+      try {
+        var oldS = localStorage.getItem(STORAGE_KEY_COMPANY);
+        if (oldS) {
+          var o = JSON.parse(oldS);
+          if (o.name || o.address) {
+            var migrated = [{ name: o.name || '株式会社サンプル', address: o.address || '' }];
+            saveWorkplaces(migrated);
+            return migrated;
+          }
+        }
+      } catch (e) {}
+      return DEFAULT_WORKPLACES.slice();
+    }
+    function saveWorkplaces(list) {
+      try { localStorage.setItem(STORAGE_KEY_WORKPLACES, JSON.stringify(list)); } catch (e) {}
+    }
+    function getWorkplace(idx) {
+      var list = getWorkplaces();
+      if (idx >= 0 && idx < list.length) return list[idx];
+      return list[0] || { name: '株式会社サンプル', address: '' };
+    }
+    function addWorkplace() {
+      var name = str('newWorkplaceName');
+      var address = str('newWorkplaceAddress');
+      if (!name) { alert('会社名を入力してください。'); return; }
+      var list = getWorkplaces();
+      list.push({ name: name, address: address });
+      saveWorkplaces(list);
+      setVal('newWorkplaceName', '');
+      setVal('newWorkplaceAddress', '');
+      renderWorkplaceList();
+      refreshWorkplaceSelect();
+    }
+    function removeWorkplace(idx) {
+      var list = getWorkplaces();
+      if (list.length <= 1) { alert('最低1つの勤務地が必要です。'); return; }
+      if (!confirm('「' + list[idx].name + '」を削除しますか？')) return;
+      list.splice(idx, 1);
+      saveWorkplaces(list);
+      renderWorkplaceList();
+      refreshWorkplaceSelect();
+      recalculate();
+    }
+    function updateWorkplace(idx, field, value) {
+      var list = getWorkplaces();
+      if (idx >= 0 && idx < list.length) {
+        list[idx][field] = value;
+        saveWorkplaces(list);
+        refreshWorkplaceSelect();
+        recalculate();
+      }
+    }
+    function renderWorkplaceList() {
+      var container = document.getElementById('workplaceListContainer');
+      if (!container) return;
+      var list = getWorkplaces();
+      container.innerHTML = '';
+      list.forEach(function(wp, i) {
+        var div = document.createElement('div');
+        div.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:10px;background:#f8f9fa;border:1px solid #e9ecef;border-radius:6px;flex-wrap:wrap;';
+        var numSpan = document.createElement('span');
+        numSpan.style.cssText = 'font-size:12px;color:#666;min-width:24px;font-weight:600;';
+        numSpan.textContent = (i + 1) + '.';
+        div.appendChild(numSpan);
+        var nameInput = document.createElement('input');
+        nameInput.type = 'text'; nameInput.value = wp.name; nameInput.placeholder = '会社名';
+        nameInput.style.cssText = 'flex:1;min-width:150px;padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:13px;';
+        nameInput.addEventListener('change', (function(ii) { return function() { updateWorkplace(ii, 'name', this.value); }; })(i));
+        div.appendChild(nameInput);
+        var addrInput = document.createElement('input');
+        addrInput.type = 'text'; addrInput.value = wp.address; addrInput.placeholder = '住所';
+        addrInput.style.cssText = 'flex:2;min-width:200px;padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:13px;';
+        addrInput.addEventListener('change', (function(ii) { return function() { updateWorkplace(ii, 'address', this.value); }; })(i));
+        div.appendChild(addrInput);
+        if (list.length > 1) {
+          var btn = document.createElement('button');
+          btn.type = 'button'; btn.className = 'btn-reset'; btn.textContent = '削除';
+          btn.addEventListener('click', (function(ii) { return function() { removeWorkplace(ii); }; })(i));
+          div.appendChild(btn);
+        }
+        container.appendChild(div);
+      });
+    }
+    function refreshWorkplaceSelect() {
+      var sel = document.getElementById('editEmpWorkplace');
+      if (!sel) return;
+      var list = getWorkplaces();
+      var prevVal = sel.value;
+      sel.innerHTML = '';
+      list.forEach(function(wp, i) {
+        var opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = wp.name + '（' + wp.address + '）';
+        sel.appendChild(opt);
+      });
+      var maxIdx = list.length - 1;
+      var parsedPrev = parseInt(prevVal, 10);
+      if (!isNaN(parsedPrev) && parsedPrev >= 0 && parsedPrev <= maxIdx) sel.value = parsedPrev;
+      else if (sel.options.length) sel.value = 0;
+    }
+    function toggleWorkplace() {
+      var content = document.getElementById('workplaceContent');
+      var btn = document.getElementById('btnToggleWorkplace');
+      if (!content || !btn) return;
+      content.style.display = content.style.display === 'none' ? 'block' : 'none';
+      btn.classList.toggle('open');
+      if (content.style.display === 'block') renderWorkplaceList();
+    }
+
+    /* ===== 年齢計算 ===== */
+    function getAgeFromBirthDate(birthDateStr) {
+      if (!birthDateStr) return null;
+      var d = new Date(birthDateStr);
+      if (isNaN(d.getTime())) return null;
+      var today = new Date();
+      var age = today.getFullYear() - d.getFullYear();
+      var m = today.getMonth() - d.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+      return age;
+    }
+    function isNursingCareTarget(birthDateStr) {
+      var age = getAgeFromBirthDate(birthDateStr);
+      return age !== null && age >= 40 && age < 65;
+    }
+
+    /* ===== 有給付与日数の計算（労働基準法準拠） ===== */
+    /*
+     * 労働基準法に基づく有給休暇の付与日数：
+     * - 6ヶ月（180日）継続勤務後：10日
+     * - 1年6ヶ月（540日）後：11日
+     * - 2年6ヶ月（900日）後：12日
+     * - 3年6ヶ月（1260日）後：14日
+     * - 4年6ヶ月（1620日）後：16日
+     * - 5年6ヶ月（1980日）後：18日
+     * - 6年6ヶ月（2340日）後：20日（上限）
+     */
+    function getPaidLeaveFromHireDate(hireDateStr) {
+      if (!hireDateStr) return null;
+      var d = new Date(hireDateStr);
+      if (isNaN(d.getTime())) return null;
+      var today = new Date();
+      var days = Math.floor((today - d) / (24 * 60 * 60 * 1000));
+      
+      if (days < 180) return 0;        // 6ヶ月未満：0日
+      if (days < 540) return 10;       // 1年6ヶ月未満：10日
+      if (days < 900) return 11;       // 2年6ヶ月未満：11日
+      if (days < 1260) return 12;      // 3年6ヶ月未満：12日
+      if (days < 1620) return 14;      // 4年6ヶ月未満：14日
+      if (days < 1980) return 16;     // 5年6ヶ月未満：16日
+      if (days < 2340) return 18;     // 6年6ヶ月未満：18日
+      return 20;                       // 6年6ヶ月以上：20日（上限）
+    }
+
+    /* ===== 社員マスタ管理 ===== */
+    function getEmployeeMaster(idx) {
+      var list = getEmployeeList();
+      var e = list[idx];
+      if (!e) return null;
+      e = {
+        name: e.name || '', empNo: e.empNo || '', dept: e.dept || '',
+        baseSalary: e.baseSalary != null ? Number(e.baseSalary) : 0,
+        hourlyWage: e.hourlyWage != null ? Number(e.hourlyWage) : 0,
+        commute: e.commute != null ? Number(e.commute) : 0,
+        position: e.position != null ? Number(e.position) : 0,
+        residentTax: e.residentTax != null ? Number(e.residentTax) : 0,
+        paidLeave: e.paidLeave != null ? Number(e.paidLeave) : 0,
+        hireDate: e.hireDate || '', birthDate: e.birthDate || '',
+        workplaceIdx: 0,
+        otherAllowance: 0, otherAllowanceDesc: '',
+        socialInsurance: true, employmentInsurance: true, dependentCount: 0, taxColumn: 'kou',
+        bankName: '', branchName: '', accountType: '普通', accountNumber: '', accountHolder: ''
+      };
+      var key = STORAGE_KEY_EMPLOYEE_MASTER_PREFIX + idx;
+      try {
+        var s = localStorage.getItem(key);
+        if (s) {
+          var o = JSON.parse(s);
+          if (o.name != null) e.name = o.name;
+          if (o.empNo != null) e.empNo = o.empNo;
+          if (o.dept != null) e.dept = o.dept;
+          if (o.baseSalary != null) e.baseSalary = Number(o.baseSalary);
+          if (o.hourlyWage != null) e.hourlyWage = Number(o.hourlyWage);
+          if (o.commute != null) e.commute = Number(o.commute);
+          if (o.position != null) e.position = Number(o.position);
+          if (o.residentTax != null) e.residentTax = Number(o.residentTax);
+          if (o.hireDate != null) e.hireDate = o.hireDate;
+          if (o.birthDate != null) e.birthDate = o.birthDate;
+          if (o.otherAllowance != null) e.otherAllowance = Number(o.otherAllowance);
+          if (o.otherAllowanceDesc != null) e.otherAllowanceDesc = o.otherAllowanceDesc;
+          if (o.socialInsurance != null) e.socialInsurance = o.socialInsurance === true || o.socialInsurance === '1' || o.socialInsurance === 1;
+          if (o.employmentInsurance != null) e.employmentInsurance = o.employmentInsurance === true || o.employmentInsurance === '1' || o.employmentInsurance === 1;
+          if (o.dependentCount != null) e.dependentCount = parseInt(o.dependentCount, 10) || 0;
+          if (o.taxColumn != null) e.taxColumn = o.taxColumn;
+          if (o.bankName != null) e.bankName = o.bankName;
+          if (o.branchName != null) e.branchName = o.branchName;
+          if (o.accountType != null) e.accountType = o.accountType;
+          if (o.accountNumber != null) e.accountNumber = o.accountNumber;
+          if (o.accountHolder != null) e.accountHolder = o.accountHolder;
+          if (o.workplaceIdx != null) e.workplaceIdx = parseInt(o.workplaceIdx, 10) || 0;
+          else if (o.companyName) {
+            var wps = getWorkplaces();
+            for (var wi = 0; wi < wps.length; wi++) { if (wps[wi].name === o.companyName) { e.workplaceIdx = wi; break; } }
+          }
+          if (o.paidLeave != null && o.paidLeave !== '' && !o.paidLeaveAuto) e.paidLeave = Number(o.paidLeave);
+          else if (e.hireDate) { var calc = getPaidLeaveFromHireDate(e.hireDate); if (calc != null) e.paidLeave = calc; }
+        } else if (e.hireDate) { var calc = getPaidLeaveFromHireDate(e.hireDate); if (calc != null) e.paidLeave = calc; }
+      } catch (err) {}
+      var wp = getWorkplace(e.workplaceIdx);
+      e.companyName = wp.name;
+      e.companyAddress = wp.address;
+      return e;
+    }
+
+    /* ===== トグル関連 ===== */
+    function toggleSettings() {
+      var content = document.getElementById('settingsContent');
+      var btn = document.getElementById('btnToggleSettings');
+      content.classList.toggle('open');
+      btn.classList.toggle('open');
+    }
+    function toggleHelp() {
+      var content = document.getElementById('helpContent');
+      var btn = document.getElementById('btnToggleHelp');
+      content.classList.toggle('open');
+      btn.classList.toggle('open');
+    }
+    function togglePrintTarget() {
+      var content = document.getElementById('printTargetContent');
+      var btn = document.getElementById('btnTogglePrintTarget');
+      if (!content || !btn) return;
+      content.style.display = content.style.display === 'none' ? 'block' : 'none';
+      btn.classList.toggle('open');
+    }
+    function toggleDeletedEmployees() {
+      var content = document.getElementById('deletedEmployeeContent');
+      var btn = document.getElementById('btnToggleDeletedEmployees');
+      if (!content || !btn) return;
+      content.style.display = content.style.display === 'none' ? 'block' : 'none';
+      btn.classList.toggle('open');
+      if (content.style.display === 'block') renderDeletedEmployeeList();
+    }
+
+    /* ===== 印刷対象管理 ===== */
+    function savePrintTarget() {
+      var arr = [];
+      var list = getEmployeeList();
+      for (var i = 0; i < list.length; i++) {
+        var el = document.getElementById('printEmp' + i);
+        arr.push(el ? el.checked : true);
+      }
+      try { localStorage.setItem(PRINT_TARGET_KEY, JSON.stringify(arr)); } catch (e) {}
+    }
+    function loadPrintTarget() {
+      try {
+        var s = localStorage.getItem(PRINT_TARGET_KEY);
+        if (!s) return;
+        var arr = JSON.parse(s);
+        var list = getEmployeeList();
+        for (var i = 0; i < list.length && i < arr.length; i++) {
+          var el = document.getElementById('printEmp' + i);
+          if (el) el.checked = !!arr[i];
+        }
+      } catch (e) {}
+    }
+    function setAllPrintTarget(checked) {
+      var list = getEmployeeList();
+      for (var i = 0; i < list.length; i++) {
+        var el = document.getElementById('printEmp' + i);
+        if (el) el.checked = checked;
+      }
+      savePrintTarget();
+    }
+    function initPrintTargetCheckboxes() {
+      var grid = document.getElementById('printTargetGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+      var list = getEmployeeList();
+      for (var i = 0; i < list.length; i++) {
+        if (isEmployeeHidden(i)) continue;
+        var e = getEmployeeMaster(i);
+        if (!e) continue;
+        var label = document.createElement('label');
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.id = 'printEmp' + i;
+        cb.checked = true;
+        cb.addEventListener('change', savePrintTarget);
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(e.empNo + ' ' + e.name + '（' + e.dept + '）'));
+        grid.appendChild(label);
+      }
+      loadPrintTarget();
+    }
+
+    /* ===== デフォルト値 ===== */
+    var DEFAULT_RATES = {
+      rateHealth: 10.00,        // 協会けんぽ全国平均（都道府県により異なる）
+      rateNursingCare: 1.59,     // 令和7年3月分から（1.60%から0.01引き下げ）
+      ratePension: 18.30,        // 変更なし
+      rateEmployment: 0.55,      // 令和7年4月1日以降（0.60%から0.05引き下げ）
+      rateOvertime: 125,         // 通常残業：25%割増
+      rateNightOvertime: 150,    // 深夜残業：50%割増
+      rateHolidayWork: 135,      // 法定休日：35%割増
+      incomeTaxBasicDeduction: 480000,  // 年額（月額40,000円で組込み済）
+      paidLeaveMax: 40,          // 有給残日数上限
+      paidLeaveAutoUse: '1'      // 有給自動充当
+    };
+    function resetRatesToDefault() {
+      Object.keys(DEFAULT_RATES).forEach(function(key) {
+        var el = document.getElementById(key);
+        if (el) el.value = DEFAULT_RATES[key];
+      });
+      saveSettings();
+      recalculate();
+    }
+
+    /* ===== 社員選択 ===== */
+    function getSelectedEmployeeIndex() {
+      var el = document.getElementById('employeeSelect');
+      if (!el) return 0;
+      var i = parseInt(el.value, 10);
+      var list = getEmployeeList();
+      var maxIdx = list.length - 1;
+      i = isNaN(i) ? 0 : Math.max(0, Math.min(maxIdx >= 0 ? maxIdx : 0, i));
+      if (isEmployeeHidden(i)) {
+        for (var j = 0; j < list.length; j++) { if (!isEmployeeHidden(j)) return j; }
+        return 0;
+      }
+      return i;
+    }
+
+    /* ===== 保存・読込 ===== */
+    function saveSettings() {
+      var idx = getSelectedEmployeeIndex();
+      var globalIds = [
+        'rateHealth', 'rateNursingCare', 'ratePension', 'rateEmployment',
+        'rateOvertime', 'rateNightOvertime', 'rateHolidayWork',
+        'incomeTaxBasicDeduction', 'paidLeaveMax', 'paidLeaveAutoUse',
+        'periodMonth', 'payDate'
+      ];
+      var global = { selectedEmployee: idx };
+      globalIds.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) global[id] = el.value;
+      });
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(global)); } catch (e) {}
+
+      var empIds = [
+        'scheduledDays', 'workedDays', 'workedHours', 'dailyScheduledHours',
+        'nightOvertimeHours', 'holidayWorkHours',
+        'otherDeduction', 'otherDeductionDesc',
+        'paidLeaveBalance', 'baseSalary', 'commuteAllowance', 'positionAllowance',
+        'otherAllowance', 'otherAllowanceDesc', 'residentTax'
+      ];
+      var empData = {};
+      empIds.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) empData[id] = el.value;
+      });
+      try { localStorage.setItem(STORAGE_KEY_EMPLOYEE_PREFIX + idx, JSON.stringify(empData)); } catch (e) {}
+    }
+
+    function loadSettings() {
+      try {
+        var s = localStorage.getItem(STORAGE_KEY);
+        if (s) {
+          var o = JSON.parse(s);
+          var idx = parseInt(o.selectedEmployee, 10);
+          if (!isNaN(idx)) {
+            var sel = document.getElementById('employeeSelect');
+            if (sel) sel.value = Math.max(0, Math.min(getEmployeeList().length - 1, idx));
+          }
+          var loadIds = [
+            'rateHealth','rateNursingCare','ratePension','rateEmployment',
+            'rateOvertime','rateNightOvertime','rateHolidayWork',
+            'incomeTaxBasicDeduction','paidLeaveMax','paidLeaveAutoUse',
+            'periodMonth','payDate'
+          ];
+          loadIds.forEach(function(id) {
+            if (o[id] != null) {
+              var el = document.getElementById(id);
+              if (el) el.value = o[id];
+            }
+          });
+        }
+        var idx = getSelectedEmployeeIndex();
+        loadCurrentEmployeeToForm(idx);
+      } catch (e) {}
+    }
+
+    function loadCurrentEmployeeToForm(idx) {
+      var e = getEmployeeMaster(idx);
+      if (!e) return;
+      setVal('editEmpName', e.name);
+      setVal('editEmpNo', e.empNo);
+      setVal('editEmpDept', e.dept);
+      setVal('editEmpHireDate', e.hireDate || '');
+      setVal('editEmpBirthDate', e.birthDate || '');
+      refreshWorkplaceSelect();
+      setVal('editEmpWorkplace', e.workplaceIdx || 0);
+      var autoDays = e.hireDate ? getPaidLeaveFromHireDate(e.hireDate) : null;
+      var autoEl = document.getElementById('editEmpPaidLeaveAuto');
+      if (autoEl) autoEl.value = autoDays != null ? '（入社日から）' + autoDays + ' 日' : '－';
+      setVal('hourlyWage', e.hourlyWage > 0 ? e.hourlyWage : '');
+      setVal('baseSalary', e.baseSalary);
+      setVal('commuteAllowance', e.commute);
+      setVal('positionAllowance', e.position);
+      setVal('otherAllowance', e.otherAllowance || 0);
+      setVal('otherAllowanceDesc', e.otherAllowanceDesc || '');
+      setVal('residentTax', e.residentTax);
+      setVal('paidLeaveBalance', e.paidLeave != null ? e.paidLeave : '');
+      setVal('editBankName', e.bankName || '');
+      setVal('editBranchName', e.branchName || '');
+      setVal('editAccountType', e.accountType || '普通');
+      setVal('editAccountNumber', e.accountNumber || '');
+      setVal('editAccountHolder', e.accountHolder || '');
+      setVal('editSocialInsurance', e.socialInsurance ? '1' : '0');
+      setVal('editEmploymentInsurance', e.employmentInsurance ? '1' : '0');
+      setVal('editDependentCount', e.dependentCount || 0);
+      setVal('editTaxColumn', e.taxColumn || 'kou');
+
+      var empKey = STORAGE_KEY_EMPLOYEE_PREFIX + idx;
+      var empS = localStorage.getItem(empKey);
+      if (empS) {
+        try {
+          var empO = JSON.parse(empS);
+          if (empO.scheduledDays != null) setVal('scheduledDays', empO.scheduledDays);
+          if (empO.workedDays != null) setVal('workedDays', empO.workedDays);
+          if (empO.dailyScheduledHours != null) setVal('dailyScheduledHours', empO.dailyScheduledHours);
+          if (empO.workedHours != null) setVal('workedHours', empO.workedHours);
+          if (empO.nightOvertimeHours != null) setVal('nightOvertimeHours', empO.nightOvertimeHours);
+          if (empO.holidayWorkHours != null) setVal('holidayWorkHours', empO.holidayWorkHours);
+          if (empO.otherDeduction != null) setVal('otherDeduction', empO.otherDeduction);
+          if (empO.otherDeductionDesc != null) setVal('otherDeductionDesc', empO.otherDeductionDesc);
+          if (empO.paidLeaveBalance != null) setVal('paidLeaveBalance', empO.paidLeaveBalance);
+          if (empO.baseSalary != null) setVal('baseSalary', empO.baseSalary);
+          if (empO.commuteAllowance != null) setVal('commuteAllowance', empO.commuteAllowance);
+          if (empO.positionAllowance != null) setVal('positionAllowance', empO.positionAllowance);
+          if (empO.otherAllowance != null) setVal('otherAllowance', empO.otherAllowance);
+          if (empO.otherAllowanceDesc != null) setVal('otherAllowanceDesc', empO.otherAllowanceDesc);
+          if (empO.residentTax != null) setVal('residentTax', empO.residentTax);
+        } catch (err) {}
+      } else {
+        setVal('scheduledDays', 22);
+        setVal('workedDays', 22);
+        setVal('dailyScheduledHours', 8);
+        setVal('workedHours', 176);
+        setVal('nightOvertimeHours', 0);
+        setVal('holidayWorkHours', 0);
+        setVal('otherDeduction', 0);
+        setVal('otherDeductionDesc', '');
+      }
+      var nameEl = document.getElementById('currentEmployeeName');
+      if (nameEl) nameEl.textContent = e.name || '—';
+    }
+
+    function saveCurrentEmployee() {
+      var idx = getSelectedEmployeeIndex();
+      var list = getEmployeeList();
+      var base = list[idx] || {};
+      var o = {
+        name: str('editEmpName') || base.name || '',
+        empNo: str('editEmpNo') || base.empNo || '',
+        dept: str('editEmpDept') || base.dept || '',
+        hireDate: str('editEmpHireDate') || '',
+        birthDate: str('editEmpBirthDate') || '',
+        workplaceIdx: parseInt(str('editEmpWorkplace'), 10) || 0,
+        baseSalary: num('baseSalary'),
+        hourlyWage: num('hourlyWage'),
+        commute: num('commuteAllowance'),
+        position: num('positionAllowance'),
+        otherAllowance: num('otherAllowance'),
+        otherAllowanceDesc: str('otherAllowanceDesc'),
+        residentTax: num('residentTax'),
+        paidLeave: num('paidLeaveBalance'),
+        bankName: str('editBankName'),
+        branchName: str('editBranchName'),
+        accountType: str('editAccountType') || '普通',
+        accountNumber: str('editAccountNumber'),
+        accountHolder: str('editAccountHolder'),
+        socialInsurance: str('editSocialInsurance') === '1',
+        employmentInsurance: str('editEmploymentInsurance') === '1',
+        dependentCount: parseInt(str('editDependentCount'), 10) || 0,
+        taxColumn: str('editTaxColumn') || 'kou'
+      };
+      try { localStorage.setItem(STORAGE_KEY_EMPLOYEE_MASTER_PREFIX + idx, JSON.stringify(o)); } catch (e) {}
+
+      var empKey = STORAGE_KEY_EMPLOYEE_PREFIX + idx;
+      try {
+        var empJson = localStorage.getItem(empKey);
+        var empO = empJson ? JSON.parse(empJson) : {};
+        empO.paidLeaveBalance = o.paidLeave;
+        empO.baseSalary = o.baseSalary;
+        empO.commuteAllowance = o.commute;
+        empO.positionAllowance = o.position;
+        empO.otherAllowance = o.otherAllowance;
+        empO.otherAllowanceDesc = o.otherAllowanceDesc;
+        empO.residentTax = o.residentTax;
+        var scDays = document.getElementById('scheduledDays');
+        var wkDays = document.getElementById('workedDays');
+        var wkHours = document.getElementById('workedHours');
+        var dlSH = document.getElementById('dailyScheduledHours');
+        if (scDays) empO.scheduledDays = scDays.value;
+        if (wkDays) empO.workedDays = wkDays.value;
+        if (dlSH) empO.dailyScheduledHours = dlSH.value;
+        if (wkHours) empO.workedHours = wkHours.value;
+        empO.nightOvertimeHours = num('nightOvertimeHours');
+        empO.holidayWorkHours = num('holidayWorkHours');
+        empO.otherDeduction = num('otherDeduction');
+        empO.otherDeductionDesc = str('otherDeductionDesc');
+        localStorage.setItem(empKey, JSON.stringify(empO));
+      } catch (err) {}
+      saveSettings();
+      refreshEmployeeLists();
+      loadCurrentEmployeeToForm(idx);
+      updatePayslipEmployeeDisplay();
+      recalculate();
+      alert('保存しました。');
+    }
+
+    function resetEmployeeMaster() {
+      var idx = getSelectedEmployeeIndex();
+      try {
+        localStorage.removeItem(STORAGE_KEY_EMPLOYEE_MASTER_PREFIX + idx);
+        localStorage.removeItem(STORAGE_KEY_EMPLOYEE_PREFIX + idx);
+      } catch (e) {}
+      loadCurrentEmployeeToForm(idx);
+      refreshEmployeeLists();
+      updatePayslipEmployeeDisplay();
+      recalculate();
+      alert('初期値に戻しました。');
+    }
+
+    function addNewEmployee() {
+      var extra = [];
+      try { extra = JSON.parse(localStorage.getItem(STORAGE_KEY_EMPLOYEE_EXTRA) || '[]'); } catch (e) {}
+      var n = EMPLOYEES.length + extra.length + 1;
+      var empNo = ('000' + n).slice(-5);
+      extra.push({ name: '新しい社員', empNo: empNo, dept: '', baseSalary: 0, hourlyWage: 0, commute: 0, position: 0, residentTax: 0, paidLeave: 0, hireDate: '', birthDate: '', workplaceIdx: 0 });
+      saveEmployeeList(extra);
+      refreshEmployeeLists();
+      var sel = document.getElementById('employeeSelect');
+      if (sel) sel.value = getEmployeeList().length - 1;
+      onEmployeeChange();
+      alert('社員を追加しました。下のフォームで名前・入社日・給与などを入力し「保存」を押してください。');
+    }
+
+    function deleteCurrentEmployee() {
+      var idx = getSelectedEmployeeIndex();
+      var e = getEmployeeMaster(idx);
+      if (!e) return;
+      if (!confirm('「' + (e.name || '') + '」を一覧から削除（非表示）しますか？\n「削除した社員の管理」から復元できます。')) return;
+      setEmployeeHidden(idx, true);
+      refreshEmployeeLists();
+      renderDeletedEmployeeList();
+      var sel = document.getElementById('employeeSelect');
+      if (sel && sel.options.length) sel.value = sel.options[0].value;
+      onEmployeeChange();
+      alert('一覧から削除しました。');
+    }
+
+    function restoreEmployee(idx) {
+      setEmployeeHidden(idx, false);
+      refreshEmployeeLists();
+      renderDeletedEmployeeList();
+      alert('復元しました。');
+    }
+
+    function renderDeletedEmployeeList() {
+      var container = document.getElementById('deletedEmployeeList');
+      if (!container) return;
+      var hidden = getHiddenEmployeeIndices();
+      container.innerHTML = '';
+      if (hidden.length === 0) {
+        container.innerHTML = '<p style="color:#888;font-size:13px;margin:0;">削除した社員はいません。</p>';
+        return;
+      }
+      hidden.forEach(function(idx) {
+        var e = getEmployeeMaster(idx);
+        if (!e) return;
+        var div = document.createElement('div');
+        div.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:8px;background:#fff;border:1px solid #eee;border-radius:4px;';
+        div.innerHTML = '<span style="flex:1;">' + (e.empNo || '') + ' ' + (e.name || '') + '（' + (e.dept || '') + '）</span><button type="button" class="btn-reset" onclick="restoreEmployee(' + idx + ')">復元</button>';
+        container.appendChild(div);
+      });
+    }
+
+    function refreshEmployeeLists() {
+      var sel = document.getElementById('employeeSelect');
+      if (sel) {
+        var list = getEmployeeList();
+        var prevVal = sel.value;
+        sel.innerHTML = '';
+        for (var i = 0; i < list.length; i++) {
+          if (isEmployeeHidden(i)) continue;
+          var e = getEmployeeMaster(i);
+          if (!e) continue;
+          var opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = e.empNo + ' ' + e.name + '（' + (e.dept || '') + '）';
+          sel.appendChild(opt);
+        }
+        var optIdx = sel.options.length ? [].findIndex.call(sel.options, function(o) { return o.value === prevVal; }) : -1;
+        if (optIdx >= 0) sel.value = prevVal; else if (sel.options.length) sel.value = sel.options[0].value;
+      }
+      initPrintTargetCheckboxes();
+      renderDeletedEmployeeList();
+      updateTimecardEmployeeName();
+    }
+
+    function onEmployeeChange() {
+      saveSettings();
+      var idx = getSelectedEmployeeIndex();
+      loadCurrentEmployeeToForm(idx);
+      updatePayslipEmployeeDisplay();
+      updateTimecardEmployeeName();
+      updateAdminUI();
+      refreshTimecardDisplay();
+      recalculate();
+    }
+
+    function updatePayslipEmployeeDisplay() {
+      var idx = getSelectedEmployeeIndex();
+      var e = getEmployeeMaster(idx);
+      if (!e) return;
+      setText('dispEmployeeName', e.name + ' 様');
+      setText('dispEmployeeDetail', '従業員番号：' + e.empNo + '　所属：' + e.dept);
+    }
+
+    function updateTimecardEmployeeName() {
+      var sel = document.getElementById('timecardEmployeeSelect');
+      if (!sel) return;
+      var currentIdx = getSelectedEmployeeIndex();
+      var list = getEmployeeList();
+      var prevVal = sel.value;
+      sel.innerHTML = '';
+      for (var i = 0; i < list.length; i++) {
+        if (isEmployeeHidden(i)) continue;
+        var e = getEmployeeMaster(i);
+        if (!e) continue;
+        var opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = e.name || '(未設定)';
+        sel.appendChild(opt);
+      }
+      sel.value = currentIdx;
+    }
+
+    function refreshTimecardDisplay() {
+      if (typeof window.loadTodayRecords === 'function') window.loadTodayRecords();
+      if (typeof updateTimecardSummary === 'function') updateTimecardSummary();
+      if (typeof updateMonthlyWorkList === 'function') updateMonthlyWorkList();
+    }
+
+    function initTimecardEmployeeSelect() {
+      var sel = document.getElementById('timecardEmployeeSelect');
+      if (!sel) return;
+      sel.addEventListener('change', function() {
+        var newIdx = parseInt(sel.value, 10);
+        if (isNaN(newIdx)) return;
+        var mainSel = document.getElementById('employeeSelect');
+        if (mainSel) mainSel.value = newIdx;
+        onEmployeeChange();
+      });
+    }
+
+    var timecardStatusTimer = null;
+    function showTimecardStatusTemporary(message) {
+      var msgEl = document.getElementById('timecardStatusMsg');
+      if (msgEl) msgEl.textContent = message;
+      if (timecardStatusTimer) clearTimeout(timecardStatusTimer);
+      timecardStatusTimer = setTimeout(function() {
+        if (msgEl) msgEl.textContent = '';
+        timecardStatusTimer = null;
+      }, 3000);
+    }
+
+    function updateCompanyDisplay() {
+      var idx = getSelectedEmployeeIndex();
+      var e = getEmployeeMaster(idx);
+      var name = (e && e.companyName) || '株式会社サンプル';
+      var addr = (e && e.companyAddress) || '';
+      setText('dispCompanyName', name);
+      setText('dispCompanyAddress', addr);
+    }
+
+    /* ===== 源泉徴収税額の計算（月額表・甲欄・電算機計算の特例準拠） ===== */
+    /*
+     * 国税庁「給与所得の源泉徴収税額表（月額表）」甲欄に基づく計算。
+     * 復興特別所得税2.1%を含む税率を使用。
+     *
+     * 引数:
+     *   grossMonthly      - 月額総支給額
+     *   socialInsTotal     - 社会保険料等合計（健保+介護+厚年+雇用）
+     *   commuteAllowance   - 通勤手当（非課税判定用）
+     *   dependentCount     - 扶養親族等の数（甲欄）
+     *
+     * 戻り値: { tax, taxableGross, afterSI }
+     *   tax           - 源泉所得税額（復興特別所得税含む）
+     *   taxableGross  - 課税対象額（総支給額 - 非課税通勤手当）
+     *   afterSI       - 社保控除後の金額
+     */
+    function calcMonthlyWithholdingTax(grossMonthly, socialInsTotal, commuteAllowance, dependentCount, taxColumn) {
+      var nonTaxableCommute = Math.min(commuteAllowance || 0, 150000);
+      var taxableGross = grossMonthly - nonTaxableCommute;
+      var afterSI = Math.max(0, taxableGross - socialInsTotal);
+
+      if (taxColumn === 'otsu') {
+        return calcOtsuWithholdingTax(afterSI, taxableGross, afterSI);
+      }
+
+      var depDeduction = Math.max(0, dependentCount || 0) * 31667;
+      var A = Math.max(0, afterSI - depDeduction);
+
+      if (A <= 88000) return { tax: 0, taxableGross: taxableGross, afterSI: afterSI };
+
+      var eid;
+      if (A <= 135417) eid = 45834;
+      else if (A <= 150000) eid = Math.floor(A * 0.4) - 8334;
+      else if (A <= 300000) eid = Math.floor(A * 0.3) + 6667;
+      else if (A <= 550000) eid = Math.floor(A * 0.2) + 36667;
+      else if (A <= 708334) eid = Math.floor(A * 0.1) + 91667;
+      else eid = 162500;
+
+      var taxableIncome = Math.max(0, A - eid - 40000);
+      if (taxableIncome <= 0) return { tax: 0, taxableGross: taxableGross, afterSI: afterSI };
+
+      var tax;
+      if (taxableIncome <= 162500)       tax = taxableIncome * 0.05105;
+      else if (taxableIncome <= 275000)  tax = taxableIncome * 0.10210 - 8296;
+      else if (taxableIncome <= 579167)  tax = taxableIncome * 0.20420 - 36374;
+      else if (taxableIncome <= 750000)  tax = taxableIncome * 0.23483 - 54113;
+      else if (taxableIncome <= 1500000) tax = taxableIncome * 0.33693 - 130688;
+      else if (taxableIncome <= 3333334) tax = taxableIncome * 0.40840 - 237893;
+      else                               tax = taxableIncome * 0.45945 - 408061;
+
+      return { tax: Math.max(0, Math.floor(tax)), taxableGross: taxableGross, afterSI: afterSI };
+    }
+
+    function calcOtsuWithholdingTax(afterSI, taxableGross, afterSIval) {
+      if (afterSI <= 0) return { tax: 0, taxableGross: taxableGross, afterSI: afterSIval };
+      var tax;
+      if (afterSI <= 88000) {
+        tax = Math.floor(afterSI * 0.03063);
+      } else {
+        var eid;
+        if (afterSI <= 135417) eid = 45834;
+        else if (afterSI <= 150000) eid = Math.floor(afterSI * 0.4) - 8334;
+        else if (afterSI <= 300000) eid = Math.floor(afterSI * 0.3) + 6667;
+        else if (afterSI <= 550000) eid = Math.floor(afterSI * 0.2) + 36667;
+        else if (afterSI <= 708334) eid = Math.floor(afterSI * 0.1) + 91667;
+        else eid = 162500;
+        var taxableIncome = Math.max(0, afterSI - eid);
+        if (taxableIncome <= 162500)       tax = taxableIncome * 0.05105;
+        else if (taxableIncome <= 275000)  tax = taxableIncome * 0.10210 - 8296;
+        else if (taxableIncome <= 579167)  tax = taxableIncome * 0.20420 - 36374;
+        else if (taxableIncome <= 750000)  tax = taxableIncome * 0.23483 - 54113;
+        else if (taxableIncome <= 1500000) tax = taxableIncome * 0.33693 - 130688;
+        else if (taxableIncome <= 3333334) tax = taxableIncome * 0.40840 - 237893;
+        else                               tax = taxableIncome * 0.45945 - 408061;
+      }
+      if (tax < 0) tax = 0;
+      return { tax: Math.floor(tax), taxableGross: taxableGross, afterSI: afterSIval };
+    }
+
+    /* ===== 税率・設定の取得 ===== */
+    function getRatesFromForm() {
+      return {
+        rateHealth: num('rateHealth') / 100 || 0.10,
+        rateNursingCare: num('rateNursingCare') / 100 || 0.016,
+        ratePension: num('ratePension') / 100 || 0.183,
+        rateEmployment: num('rateEmployment') / 100 || 0.006,
+        rateOvertime: (num('rateOvertime') || 125) / 100,
+        rateNightOvertime: (num('rateNightOvertime') || 150) / 100,
+        rateHolidayWork: (num('rateHolidayWork') || 135) / 100,
+        basicDeduction: num('incomeTaxBasicDeduction'),
+        paidLeaveMax: num('paidLeaveMax') || 40,
+        paidLeaveAutoUse: str('paidLeaveAutoUse') === '1'
+      };
+    }
+
+    /* ===== 社員のフォームデータ取得（まとめて印刷用） ===== */
+    function getEmployeeFormData(idx) {
+      var emp = getEmployeeMaster(idx);
+      if (!emp) return null;
+      var key = STORAGE_KEY_EMPLOYEE_PREFIX + idx;
+      var s = null;
+      try { s = localStorage.getItem(key); } catch (e) {}
+      var scheduledDays = 22, workedDays = 22, workedHours = 176, dailyScheduledHours = 8;
+      var nightOvertimeHours = 0, holidayWorkHours = 0;
+      var otherDeduction = 0, otherDeductionDesc = '';
+      var baseSalary = emp.baseSalary, hourlyWage = emp.hourlyWage != null ? Number(emp.hourlyWage) : 0;
+      var commute = emp.commute, position = emp.position, residentTax = emp.residentTax;
+      var otherAllowance = emp.otherAllowance || 0, otherAllowanceDesc = emp.otherAllowanceDesc || '';
+      var paidLeaveBalance = emp.paidLeave;
+      if (s) {
+        try {
+          var o = JSON.parse(s);
+          if (o.scheduledDays != null) { var v = parseFloat(o.scheduledDays); if (!isNaN(v)) scheduledDays = v; }
+          if (o.workedDays != null) { var v = parseFloat(o.workedDays); if (!isNaN(v)) workedDays = v; }
+          if (o.workedHours != null) { var v = parseFloat(o.workedHours); if (!isNaN(v)) workedHours = v; }
+          if (o.dailyScheduledHours != null) { var v = parseFloat(o.dailyScheduledHours); if (!isNaN(v)) dailyScheduledHours = v; }
+          if (o.nightOvertimeHours != null) { var v = parseFloat(o.nightOvertimeHours); if (!isNaN(v)) nightOvertimeHours = v; }
+          if (o.holidayWorkHours != null) { var v = parseFloat(o.holidayWorkHours); if (!isNaN(v)) holidayWorkHours = v; }
+          if (o.otherDeduction != null) { var v = parseFloat(o.otherDeduction); if (!isNaN(v)) otherDeduction = v; }
+          if (o.otherDeductionDesc != null) otherDeductionDesc = o.otherDeductionDesc;
+          if (o.baseSalary != null) { var v = parseFloat(o.baseSalary); if (!isNaN(v)) baseSalary = v; }
+          if (o.commuteAllowance != null) { var v = parseFloat(o.commuteAllowance); if (!isNaN(v)) commute = v; }
+          if (o.positionAllowance != null) { var v = parseFloat(o.positionAllowance); if (!isNaN(v)) position = v; }
+          if (o.otherAllowance != null) { var v = parseFloat(o.otherAllowance); if (!isNaN(v)) otherAllowance = v; }
+          if (o.otherAllowanceDesc != null) otherAllowanceDesc = o.otherAllowanceDesc;
+          if (o.residentTax != null) { var v = parseFloat(o.residentTax); if (!isNaN(v)) residentTax = v; }
+          if (o.paidLeaveBalance != null) { var v = parseFloat(o.paidLeaveBalance); if (!isNaN(v)) paidLeaveBalance = v; }
+        } catch (err) {}
+      }
+      return {
+        scheduledDays: scheduledDays, workedDays: workedDays, workedHours: workedHours,
+        dailyScheduledHours: dailyScheduledHours,
+        nightOvertimeHours: nightOvertimeHours, holidayWorkHours: holidayWorkHours,
+        baseSalary: baseSalary, hourlyWage: hourlyWage,
+        commuteAllowance: commute, positionAllowance: position,
+        otherAllowance: otherAllowance, otherAllowanceDesc: otherAllowanceDesc,
+        residentTax: residentTax, otherDeduction: otherDeduction, otherDeductionDesc: otherDeductionDesc,
+        paidLeaveBalance: Math.min(paidLeaveBalance, 999),
+        name: emp.name, empNo: emp.empNo, dept: emp.dept,
+        companyName: emp.companyName || '', companyAddress: emp.companyAddress || '',
+        birthDate: emp.birthDate || '',
+        bankName: emp.bankName || '', branchName: emp.branchName || '',
+        accountType: emp.accountType || '普通', accountNumber: emp.accountNumber || '',
+        accountHolder: emp.accountHolder || '',
+        socialInsurance: emp.socialInsurance !== false,
+        employmentInsurance: emp.employmentInsurance !== false,
+        dependentCount: emp.dependentCount || 0,
+        taxColumn: emp.taxColumn || 'kou'
+      };
+    }
+
+    /* ===== 給与計算エンジン ===== */
+    function calcOnePayslip(data, rates) {
+      var dailyHours = data.dailyScheduledHours || 8;
+      var scheduledHours = data.scheduledDays * dailyHours;
+      var paidLeaveBalance = Math.min(data.paidLeaveBalance, rates.paidLeaveMax > 0 ? rates.paidLeaveMax : 999);
+      var absentDays = Math.max(0, data.scheduledDays - data.workedDays);
+      var paidLeaveUsed = rates.paidLeaveAutoUse ? Math.min(absentDays, paidLeaveBalance) : 0;
+      var unpaidAbsentDays = absentDays - paidLeaveUsed;
+      var paidLeaveRemain = paidLeaveBalance - paidLeaveUsed;
+      var overtimeHours = Math.max(0, data.workedHours - scheduledHours);
+      var hourRate = (data.hourlyWage > 0) ? data.hourlyWage : (scheduledHours > 0 ? data.baseSalary / scheduledHours : 0);
+      var effectiveDays = data.workedDays + paidLeaveUsed;
+      var basePay;
+      if (data.hourlyWage > 0 && (!data.baseSalary || data.baseSalary <= 0)) {
+        basePay = Math.round(data.workedHours * data.hourlyWage);
+      } else {
+        basePay = data.scheduledDays > 0 ? Math.round((effectiveDays / data.scheduledDays) * data.baseSalary) : 0;
+      }
+      var normalOvertimeHours = Math.max(0, overtimeHours - (data.nightOvertimeHours || 0) - (data.holidayWorkHours || 0));
+      var overtimePay = Math.round(normalOvertimeHours * hourRate * rates.rateOvertime);
+      var nightOvertimePay = Math.round((data.nightOvertimeHours || 0) * hourRate * rates.rateNightOvertime);
+      var holidayWorkPay = Math.round((data.holidayWorkHours || 0) * hourRate * rates.rateHolidayWork);
+      var commutePay = Math.round(data.commuteAllowance * data.workedDays);
+      var otherAllowance = data.otherAllowance || 0;
+      var gross = basePay + commutePay + overtimePay + nightOvertimePay + holidayWorkPay + data.positionAllowance + otherAllowance;
+
+      var applySocial = data.socialInsurance !== false;
+      var applyEmployment = data.employmentInsurance !== false;
+      var healthInsurance = applySocial ? Math.round(gross * rates.rateHealth / 2) : 0;
+      var isNursing = applySocial && isNursingCareTarget(data.birthDate);
+      var nursingCareInsurance = isNursing ? Math.round(gross * rates.rateNursingCare / 2) : 0;
+      var pensionInsurance = applySocial ? Math.round(gross * rates.ratePension / 2) : 0;
+      var employmentInsurance = applyEmployment ? Math.round(gross * rates.rateEmployment) : 0;
+      var socialInsuranceTotal = healthInsurance + nursingCareInsurance + pensionInsurance + employmentInsurance;
+      var taxResult = calcMonthlyWithholdingTax(gross, socialInsuranceTotal, commutePay, data.dependentCount || 0, data.taxColumn || 'kou');
+      var incomeTax = taxResult.tax;
+      var otherDeduction = data.otherDeduction || 0;
+      var totalDeduction = socialInsuranceTotal + incomeTax + data.residentTax + otherDeduction;
+      var netPay = gross - totalDeduction;
+
+      return {
+        scheduledDays: data.scheduledDays, workedDays: data.workedDays,
+        absentDays: absentDays, paidLeaveUsed: paidLeaveUsed,
+        unpaidAbsentDays: unpaidAbsentDays,
+        workedHours: data.workedHours, overtimeHours: overtimeHours,
+        nightOvertimeHours: data.nightOvertimeHours || 0,
+        holidayWorkHours: data.holidayWorkHours || 0,
+        paidLeaveRemain: paidLeaveRemain,
+        basePay: basePay, commuteAllowance: commutePay,
+        overtimePay: overtimePay, nightOvertimePay: nightOvertimePay,
+        holidayWorkPay: holidayWorkPay,
+        overtimeRatePct: Math.round((rates.rateOvertime || 1.25) * 100),
+        nightOvertimeRatePct: Math.round((rates.rateNightOvertime || 1.50) * 100),
+        holidayWorkRatePct: Math.round((rates.rateHolidayWork || 1.35) * 100),
+        positionAllowance: data.positionAllowance,
+        otherAllowance: otherAllowance, otherAllowanceDesc: data.otherAllowanceDesc || '',
+        gross: gross, taxableGross: taxResult.taxableGross, afterSI: taxResult.afterSI,
+        applySocial: applySocial, applyEmployment: applyEmployment,
+        healthInsurance: healthInsurance, nursingCareInsurance: nursingCareInsurance,
+        isNursing: isNursing,
+        pensionInsurance: pensionInsurance, employmentInsurance: employmentInsurance,
+        incomeTax: incomeTax, residentTax: data.residentTax,
+        otherDeduction: otherDeduction, otherDeductionDesc: data.otherDeductionDesc || '',
+        totalDeduction: totalDeduction, netPay: netPay,
+        taxColumn: data.taxColumn || 'kou'
+      };
+    }
+
+    /* ===== 給与明細HTML生成（まとめて印刷用） ===== */
+    function buildPayslipHTML(emp, result, periodText) {
+      function n(x) { return typeof x === 'number' ? x.toLocaleString() : x; }
+      var cName = emp.companyName || '株式会社サンプル';
+      var cAddr = emp.companyAddress || '';
+      var otherAllowRow = result.otherAllowance > 0
+        ? '<tr><th>' + (result.otherAllowanceDesc || 'その他手当') + '</th><td class="amount">' + n(result.otherAllowance) + ' 円</td></tr>'
+        : '';
+      var nursingRow = result.isNursing
+        ? '<tr><th>介護保険（折半）</th><td class="amount">- ' + n(result.nursingCareInsurance) + ' 円</td></tr>'
+        : '';
+      var otherDeductRow = result.otherDeduction > 0
+        ? '<tr><th>' + (result.otherDeductionDesc || 'その他控除') + '</th><td class="amount">- ' + n(result.otherDeduction) + ' 円</td></tr>'
+        : '';
+      var bankInfo = '';
+      if (emp.bankName) {
+        bankInfo = emp.bankName + ' ' + (emp.branchName || '') + ' ' + (emp.accountType || '普通') + ' ' + (emp.accountNumber || '') + ' ' + (emp.accountHolder || emp.name);
+      } else {
+        bankInfo = '○○銀行 △△支店 普通 1234567 ' + emp.name;
+      }
+
+      return '<div class="payslip">' +
+        '<div class="header"><h1>給与明細書</h1><p class="period">' + periodText + '</p></div>' +
+        '<div class="info-grid">' +
+        '<div class="info-block"><h3>勤務先</h3><div class="company">' + cName + '</div><div class="detail">' + cAddr + '</div></div>' +
+        '<div class="info-block"><h3>従業員</h3><div class="employee">' + emp.name + ' 様</div><div class="detail">従業員番号：' + emp.empNo + '　所属：' + emp.dept + '</div></div>' +
+        '</div>' +
+        '<table>' +
+        '<tr class="section-title"><th colspan="2">勤怠</th></tr>' +
+        '<tr><th>所定労働日数</th><td class="amount">' + result.scheduledDays + ' 日</td></tr>' +
+        '<tr><th>出勤日数</th><td class="amount">' + result.workedDays + ' 日</td></tr>' +
+        '<tr><th>欠勤日数</th><td class="amount">' + result.absentDays + ' 日</td></tr>' +
+        '<tr><th>有給休暇消化日数</th><td class="amount">' + result.paidLeaveUsed + ' 日</td></tr>' +
+        '<tr><th>無給欠勤日数</th><td class="amount">' + result.unpaidAbsentDays + ' 日</td></tr>' +
+        '<tr><th>勤務時間（総労働時間）</th><td class="amount">' + formatHoursMinutes(result.workedHours) + '</td></tr>' +
+        (result.overtimeHours > 0 ? '<tr><th>残業時間</th><td class="amount">' + formatHoursMinutes(result.overtimeHours) + '</td></tr>' : '') +
+        (result.nightOvertimeHours > 0 ? '<tr><th>うち深夜残業時間</th><td class="amount">' + formatHoursMinutes(result.nightOvertimeHours) + '</td></tr>' : '') +
+        (result.holidayWorkHours > 0 ? '<tr><th>法定休日出勤時間</th><td class="amount">' + formatHoursMinutes(result.holidayWorkHours) + '</td></tr>' : '') +
+        '<tr><th>有給残日数（月末）</th><td class="amount">' + result.paidLeaveRemain + ' 日</td></tr>' +
+        '<tr class="section-title"><th colspan="2">支給</th></tr>' +
+        '<tr><th>基本給（日割り・有給含む）</th><td class="amount">' + n(result.basePay) + ' 円</td></tr>' +
+        '<tr><th>通勤手当（日額 × 出勤日数）</th><td class="amount">' + n(result.commuteAllowance) + ' 円</td></tr>' +
+        (result.overtimePay > 0 ? '<tr><th>残業手当（' + result.overtimeRatePct + '%）</th><td class="amount">' + n(result.overtimePay) + ' 円</td></tr>' : '') +
+        (result.nightOvertimePay > 0 ? '<tr><th>深夜残業手当（' + result.nightOvertimeRatePct + '%）</th><td class="amount">' + n(result.nightOvertimePay) + ' 円</td></tr>' : '') +
+        (result.holidayWorkPay > 0 ? '<tr><th>休日出勤手当（' + result.holidayWorkRatePct + '%）</th><td class="amount">' + n(result.holidayWorkPay) + ' 円</td></tr>' : '') +
+        (result.positionAllowance > 0 ? '<tr><th>役職手当</th><td class="amount">' + n(result.positionAllowance) + ' 円</td></tr>' : '') +
+        otherAllowRow +
+        '<tr class="total-row"><th>支給合計</th><td class="amount">' + n(result.gross) + ' 円</td></tr>' +
+        '<tr style="background:#fffde7;"><th>課税対象額（税計算の基礎）</th><td class="amount" style="color:#b8860b;">' + n(result.taxableGross) + ' 円</td></tr>' +
+        '<tr class="section-title"><th colspan="2">控除</th></tr>' +
+        '<tr style="background:#f0f7ff;"><th>社保控除後の金額</th><td class="amount" style="color:#1a5490;">' + n(result.afterSI) + ' 円</td></tr>' +
+        (result.applySocial ? '<tr><th>健康保険（折半）</th><td class="amount">- ' + n(result.healthInsurance) + ' 円</td></tr>' : '') +
+        nursingRow +
+        (result.applySocial ? '<tr><th>厚生年金保険（折半）</th><td class="amount">- ' + n(result.pensionInsurance) + ' 円</td></tr>' : '') +
+        (result.applyEmployment ? '<tr><th>雇用保険</th><td class="amount">- ' + n(result.employmentInsurance) + ' 円</td></tr>' : '') +
+        '<tr><th>所得税（復興特別所得税含む' + (result.taxColumn === 'otsu' ? '・乙欄' : '・甲欄') + '）</th><td class="amount">- ' + n(result.incomeTax) + ' 円</td></tr>' +
+        '<tr><th>住民税</th><td class="amount">- ' + n(result.residentTax) + ' 円</td></tr>' +
+        otherDeductRow +
+        '<tr class="total-row"><th>控除合計</th><td class="amount">- ' + n(result.totalDeduction) + ' 円</td></tr>' +
+        '</table>' +
+        '<div class="net-pay">差引支給額（手取額）　<span>' + n(result.netPay) + ' 円</span></div>' +
+        '<div class="memo">※ 振込先：' + bankInfo + '<br>※ ご不明な点は総務部までお問い合わせください。</div>' +
+        '<div class="stamp-area"><table><tr><th>承認</th><th>確認</th><th>受領印</th></tr><tr><td></td><td></td><td></td></tr></table></div>' +
+        '</div>';
+    }
+
+    /* ===== まとめて印刷 ===== */
+    function printAllPayslips() {
+      saveSettings();
+      var periodText = (str('periodMonth') || getDefaultPeriodMonth()) + '　支給日：' + (str('payDate') || getDefaultPayDate());
+      var rates = getRatesFromForm();
+      var html = '';
+      var list = getEmployeeList();
+      for (var i = 0; i < list.length; i++) {
+        if (isEmployeeHidden(i)) continue;
+        var cb = document.getElementById('printEmp' + i);
+        if (cb && !cb.checked) continue;
+        var data = getEmployeeFormData(i);
+        if (!data) continue;
+        var result = calcOnePayslip(data, rates);
+        html += buildPayslipHTML(data, result, periodText);
+      }
+      if (!html) {
+        alert('印刷対象の社員が1人も選択されていません。\n「印刷対象を選択」で印刷する社員にチェックを入れてください。');
+        return;
+      }
+      var container = document.getElementById('batchPrintContainer');
+      if (!container) return;
+      container.innerHTML = html;
+      container.classList.add('batch-print');
+      document.body.classList.add('batch-print-mode');
+      window.print();
+      document.body.classList.remove('batch-print-mode');
+      container.classList.remove('batch-print');
+      container.innerHTML = '';
+    }
+
+    /* ===== メイン再計算 ===== */
+    function recalculate() {
+      var scheduledDays = num('scheduledDays') || 22;
+      var workedDays = num('workedDays');
+      var workedHours = num('workedHours');
+      var dailyScheduledHours = num('dailyScheduledHours') || 8;
+      var scheduledHours = scheduledDays * dailyScheduledHours;
+      var paidLeaveBalance = num('paidLeaveBalance');
+      var paidLeaveMax = num('paidLeaveMax');
+      var paidLeaveAutoUse = str('paidLeaveAutoUse') === '1';
+      paidLeaveBalance = Math.min(paidLeaveBalance, paidLeaveMax > 0 ? paidLeaveMax : 999);
+
+      var baseSalary = num('baseSalary');
+      var commuteAllowance = num('commuteAllowance');
+      var positionAllowance = num('positionAllowance');
+      var otherAllowanceVal = num('otherAllowance');
+      var otherAllowanceDescVal = str('otherAllowanceDesc');
+      var residentTax = num('residentTax');
+      var nightOvertimeHoursVal = num('nightOvertimeHours');
+      var holidayWorkHoursVal = num('holidayWorkHours');
+      var otherDeductionVal = num('otherDeduction');
+      var otherDeductionDescVal = str('otherDeductionDesc');
+      var emp = getEmployeeMaster(getSelectedEmployeeIndex());
+      var hourlyWage = num('hourlyWage') || (emp && emp.hourlyWage) || 0;
+      var birthDate = (emp && emp.birthDate) || '';
+
+      var rateHealth = num('rateHealth') / 100 || 0.10;
+      var rateNursingCare = num('rateNursingCare') / 100 || 0.016;
+      var ratePension = num('ratePension') / 100 || 0.183;
+      var rateEmployment = num('rateEmployment') / 100 || 0.006;
+      var rateOvertime = (num('rateOvertime') || 125) / 100;
+      var rateNightOvertime = (num('rateNightOvertime') || 150) / 100;
+      var rateHolidayWork = (num('rateHolidayWork') || 135) / 100;
+      var basicDeduction = num('incomeTaxBasicDeduction');
+
+      var absentDays = Math.max(0, scheduledDays - workedDays);
+      var paidLeaveUsed = paidLeaveAutoUse ? Math.min(absentDays, paidLeaveBalance) : 0;
+      var unpaidAbsentDays = absentDays - paidLeaveUsed;
+      var paidLeaveRemain = paidLeaveBalance - paidLeaveUsed;
+      var overtimeHours = Math.max(0, workedHours - scheduledHours);
+
+      var hourRate = hourlyWage > 0 ? hourlyWage : (scheduledHours > 0 ? baseSalary / scheduledHours : 0);
+
+      var effectiveDays = workedDays + paidLeaveUsed;
+      var basePay;
+      if (hourlyWage > 0 && (!baseSalary || baseSalary <= 0)) {
+        basePay = Math.round(workedHours * hourlyWage);
+      } else {
+        basePay = scheduledDays > 0 ? Math.round((effectiveDays / scheduledDays) * baseSalary) : 0;
+      }
+      var normalOvertimeHours = Math.max(0, overtimeHours - nightOvertimeHoursVal - holidayWorkHoursVal);
+      var overtimePay = Math.round(normalOvertimeHours * hourRate * rateOvertime);
+      var nightOvertimePay = Math.round(nightOvertimeHoursVal * hourRate * rateNightOvertime);
+      var holidayWorkPay = Math.round(holidayWorkHoursVal * hourRate * rateHolidayWork);
+      var commutePay = Math.round(commuteAllowance * workedDays);
+      var gross = basePay + commutePay + overtimePay + nightOvertimePay + holidayWorkPay + positionAllowance + otherAllowanceVal;
+
+      var applySocial = str('editSocialInsurance') !== '0';
+      var applyEmployment = str('editEmploymentInsurance') !== '0';
+      var healthInsurance = applySocial ? Math.round(gross * rateHealth / 2) : 0;
+      var isNursing = applySocial && isNursingCareTarget(birthDate);
+      var nursingCareInsurance = isNursing ? Math.round(gross * rateNursingCare / 2) : 0;
+      var pensionInsurance = applySocial ? Math.round(gross * ratePension / 2) : 0;
+      var employmentInsurance = applyEmployment ? Math.round(gross * rateEmployment) : 0;
+      var socialInsuranceTotal = healthInsurance + nursingCareInsurance + pensionInsurance + employmentInsurance;
+      var dependentCount = (emp && emp.dependentCount) || parseInt(str('editDependentCount'), 10) || 0;
+      var taxColumn = str('editTaxColumn') || (emp && emp.taxColumn) || 'kou';
+      var taxResult = calcMonthlyWithholdingTax(gross, socialInsuranceTotal, commutePay, dependentCount, taxColumn);
+      var incomeTax = taxResult.tax;
+      var taxableGross = taxResult.taxableGross;
+      var totalDeduction = socialInsuranceTotal + incomeTax + residentTax + otherDeductionVal;
+      var netPay = gross - totalDeduction;
+
+      var periodText = (str('periodMonth') || getDefaultPeriodMonth()) + '　支給日：' + (str('payDate') || getDefaultPayDate());
+      setText('periodText', periodText);
+
+      setText('dispScheduledDays', scheduledDays + ' 日');
+      setText('dispWorkedDays', workedDays + ' 日');
+      setText('dispAbsentDays', absentDays + ' 日');
+      setText('dispPaidLeaveUsed', paidLeaveUsed + ' 日');
+      setText('dispUnpaidAbsentDays', unpaidAbsentDays + ' 日');
+      setText('dispWorkedHours', formatHoursMinutes(workedHours));
+      setText('dispOvertimeHours', formatHoursMinutes(overtimeHours));
+      setText('dispNightOvertimeHours', formatHoursMinutes(nightOvertimeHoursVal));
+      setText('dispHolidayWorkHours', formatHoursMinutes(holidayWorkHoursVal));
+      setText('dispPaidLeaveRemain', paidLeaveRemain + ' 日');
+
+      var rowNightH = document.getElementById('rowNightOvertimeHours');
+      if (rowNightH) rowNightH.style.display = nightOvertimeHoursVal > 0 ? '' : 'none';
+      var rowHolidayH = document.getElementById('rowHolidayWorkHours');
+      if (rowHolidayH) rowHolidayH.style.display = holidayWorkHoursVal > 0 ? '' : 'none';
+
+      setText('dispOvertimeRate', Math.round(rateOvertime * 100));
+      setText('dispNightOvertimeRate', Math.round(rateNightOvertime * 100));
+      setText('dispHolidayWorkRate', Math.round(rateHolidayWork * 100));
+
+      setText('dispBaseSalary', basePay.toLocaleString() + ' 円');
+      setText('dispCommute', commutePay.toLocaleString() + ' 円');
+      setText('dispOvertimePay', overtimePay.toLocaleString() + ' 円');
+      var rowOTP = document.getElementById('rowOvertimePay');
+      if (rowOTP) rowOTP.style.display = overtimePay > 0 ? '' : 'none';
+      setText('dispNightOvertimePay', nightOvertimePay.toLocaleString() + ' 円');
+      setText('dispHolidayWorkPay', holidayWorkPay.toLocaleString() + ' 円');
+      var rowNightP = document.getElementById('rowNightOvertimePay');
+      if (rowNightP) rowNightP.style.display = nightOvertimePay > 0 ? '' : 'none';
+      var rowHolidayP = document.getElementById('rowHolidayWorkPay');
+      if (rowHolidayP) rowHolidayP.style.display = holidayWorkPay > 0 ? '' : 'none';
+      setText('dispPosition', positionAllowance.toLocaleString() + ' 円');
+      var rowPos = document.getElementById('rowPositionAllowance');
+      if (rowPos) rowPos.style.display = positionAllowance > 0 ? '' : 'none';
+
+      var rowOtherAllow = document.getElementById('rowOtherAllowance');
+      if (rowOtherAllow) rowOtherAllow.style.display = otherAllowanceVal > 0 ? '' : 'none';
+      setText('dispOtherAllowanceLabel', otherAllowanceDescVal || 'その他手当');
+      setText('dispOtherAllowance', otherAllowanceVal.toLocaleString() + ' 円');
+
+      setText('dispGross', gross.toLocaleString() + ' 円');
+      setText('dispTaxableGross', taxableGross.toLocaleString() + ' 円');
+      setText('dispAfterSI', taxResult.afterSI.toLocaleString() + ' 円');
+
+      var rowHealth = document.getElementById('rowHealth');
+      if (rowHealth) rowHealth.style.display = applySocial ? '' : 'none';
+      setText('dispHealth', '- ' + healthInsurance.toLocaleString() + ' 円');
+      var rowNursing = document.getElementById('rowNursingCare');
+      if (rowNursing) rowNursing.style.display = isNursing ? '' : 'none';
+      setText('dispNursingCare', '- ' + nursingCareInsurance.toLocaleString() + ' 円');
+      var rowPension = document.getElementById('rowPension');
+      if (rowPension) rowPension.style.display = applySocial ? '' : 'none';
+      setText('dispPension', '- ' + pensionInsurance.toLocaleString() + ' 円');
+      var rowEmployment = document.getElementById('rowEmployment');
+      if (rowEmployment) rowEmployment.style.display = applyEmployment ? '' : 'none';
+      setText('dispEmployment', '- ' + employmentInsurance.toLocaleString() + ' 円');
+      var taxColLabel = taxColumn === 'otsu' ? '・乙欄' : '・甲欄';
+      setText('dispIncomeTaxLabel', '所得税（復興特別所得税含む' + taxColLabel + '）');
+      setText('dispIncomeTax', '- ' + incomeTax.toLocaleString() + ' 円');
+      setText('dispResidentTax', '- ' + residentTax.toLocaleString() + ' 円');
+
+      var rowOtherDeduct = document.getElementById('rowOtherDeduction');
+      if (rowOtherDeduct) rowOtherDeduct.style.display = otherDeductionVal > 0 ? '' : 'none';
+      setText('dispOtherDeductionLabel', otherDeductionDescVal || 'その他控除');
+      setText('dispOtherDeduction', '- ' + otherDeductionVal.toLocaleString() + ' 円');
+
+      setText('dispTotalDeduction', '- ' + totalDeduction.toLocaleString() + ' 円');
+      setText('dispNetPay', netPay.toLocaleString() + ' 円');
+
+      updateMemoSection();
+      updatePayslipEmployeeDisplay();
+      updateCompanyDisplay();
+
+      var warnings = [];
+      if (workedDays > scheduledDays) warnings.push('出勤日数（' + workedDays + '日）が所定労働日数（' + scheduledDays + '日）を超えています。');
+      if (nightOvertimeHoursVal > overtimeHours && overtimeHours >= 0) warnings.push('深夜残業時間（' + nightOvertimeHoursVal + 'h）が残業時間（' + overtimeHours.toFixed(2) + 'h）を超えています。');
+      if (nightOvertimeHoursVal + holidayWorkHoursVal > workedHours) warnings.push('深夜残業+休日出勤時間が総労働時間を超えています。');
+      if (netPay < 0) warnings.push('⚠ 差引支給額がマイナスになっています。入力値を確認してください。');
+      if (scheduledDays <= 0) warnings.push('所定労働日数が0以下です。正しい値を入力してください。');
+      if (dailyScheduledHours <= 0 || dailyScheduledHours > 12) warnings.push('1日の所定労働時間が異常です（0以下または12時間超）。');
+      if (workedHours < 0) warnings.push('勤務時間がマイナスです。正しい値を入力してください。');
+      var warnEl = document.getElementById('validationWarnings');
+      if (warnEl) {
+        if (warnings.length > 0) {
+          warnEl.style.display = 'block';
+          warnEl.innerHTML = warnings.map(function(w) { return '<div class="validation-warn">⚠ ' + w + '</div>'; }).join('');
+        } else {
+          warnEl.style.display = 'none';
+          warnEl.innerHTML = '';
+        }
+      }
+
+      saveSettings();
+    }
+
+    function updateMemoSection() {
+      var idx = getSelectedEmployeeIndex();
+      var emp = getEmployeeMaster(idx);
+      if (!emp) return;
+      var memoEl = document.getElementById('dispMemo');
+      if (!memoEl) return;
+      var bankInfo;
+      if (emp.bankName) {
+        bankInfo = emp.bankName + ' ' + (emp.branchName || '') + ' ' + (emp.accountType || '普通') + ' ' + (emp.accountNumber || '') + ' ' + (emp.accountHolder || emp.name);
+      } else {
+        bankInfo = '○○銀行 △△支店 普通 1234567 ' + emp.name;
+      }
+      memoEl.innerHTML = '※ 振込先：' + bankInfo + '<br>※ ご不明な点は総務部までお問い合わせください。';
+    }
+
+    /* ===== データエクスポート・インポート ===== */
+    function exportData() {
+      var data = {};
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (key && (key.indexOf('payslip_') === 0 || key.indexOf('timecard_') === 0)) {
+          data[key] = localStorage.getItem(key);
+        }
+      }
+      var json = JSON.stringify(data, null, 2);
+      var blob = new Blob([json], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      var dateStr = new Date().toISOString().slice(0, 10);
+      a.download = '給与明細データ_' + dateStr + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      alert('データをエクスポートしました。');
+    }
+
+    function importData() {
+      var input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+          try {
+            var data = JSON.parse(ev.target.result);
+            if (typeof data !== 'object' || data === null) {
+              alert('無効なファイル形式です。');
+              return;
+            }
+            var keyCount = Object.keys(data).length;
+            if (!confirm('インポートすると現在のデータが上書きされます。\n' + keyCount + ' 件のデータを復元しますか？')) return;
+            Object.keys(data).forEach(function(key) {
+              localStorage.setItem(key, data[key]);
+            });
+            alert('データをインポートしました。ページを再読み込みします。');
+            location.reload();
+          } catch (err) {
+            alert('ファイルの読み込みに失敗しました。\n正しいJSONファイルか確認してください。');
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    }
+
+    function clearAllData() {
+      if (!confirm('本当にすべてのデータを削除しますか？\nこの操作は元に戻せません。\n事前にエクスポートすることをお勧めします。')) return;
+      if (!confirm('最終確認：すべての社員データ・設定が完全に削除されます。よろしいですか？')) return;
+      var keysToRemove = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (key && (key.indexOf('payslip_') === 0 || key.indexOf('timecard_') === 0)) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(function(key) {
+        localStorage.removeItem(key);
+      });
+      alert('すべてのデータを削除しました。ページを再読み込みします。');
+      location.reload();
+    }
+
+    /* ===== スケジューラ ===== */
+    var recalcTimeout;
+    function scheduleRecalc() {
+      clearTimeout(recalcTimeout);
+      recalcTimeout = setTimeout(recalculate, 50);
+    }
+    var saveTimeout;
+    function scheduleSave() {
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(saveSettings, 300);
+    }
+
+    /* ===== イベントリスナー登録 ===== */
+    var inputIds = [
+      'rateHealth', 'rateNursingCare', 'ratePension', 'rateEmployment',
+      'rateOvertime', 'rateNightOvertime', 'rateHolidayWork',
+      'incomeTaxBasicDeduction', 'paidLeaveMax', 'paidLeaveAutoUse',
+      'scheduledDays', 'workedDays', 'workedHours', 'dailyScheduledHours',
+      'nightOvertimeHours', 'holidayWorkHours',
+      'otherDeduction', 'otherDeductionDesc',
+      'paidLeaveBalance', 'baseSalary', 'hourlyWage',
+      'commuteAllowance', 'positionAllowance',
+      'otherAllowance', 'otherAllowanceDesc',
+      'residentTax', 'periodMonth', 'payDate',
+      'editSocialInsurance', 'editEmploymentInsurance', 'editDependentCount', 'editTaxColumn'
+    ];
+    inputIds.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('input', scheduleRecalc);
+      el.addEventListener('change', scheduleSave);
+    });
+
+    /* ===== タイムカード機能 ===== */
+
+    function updateTimecardDisplay() {
+      startTimecardClockNow();
+    }
+    
+    // 時計を1秒ごとに更新（グローバルスコープ）
+    function startTimecardClock() {
+      startTimecardClockNow();
+    }
+    // グローバルスコープにも公開
+    window.startTimecardClock = startTimecardClock;
+    window.updateTimecardDisplay = updateTimecardDisplay;
+
+    function getTimecardStorageKey(empIdx) {
+      var idx = (empIdx !== undefined) ? empIdx : getSelectedEmployeeIndex();
+      return STORAGE_KEY_TIMECARD + '_' + idx;
+    }
+
+    function getTimecardRecords(empIdx) {
+      try {
+        var key = getTimecardStorageKey(empIdx);
+        var s = localStorage.getItem(key);
+        return s ? JSON.parse(s) : {};
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function saveTimecardRecords(records, empIdx) {
+      try {
+        var key = getTimecardStorageKey(empIdx);
+        localStorage.setItem(key, JSON.stringify(records));
+      } catch (e) {}
+    }
+
+    function migrateOldTimecardData() {
+      try {
+        var oldData = localStorage.getItem(STORAGE_KEY_TIMECARD);
+        if (oldData && !localStorage.getItem('timecard_migrated')) {
+          var records = JSON.parse(oldData);
+          if (records && typeof records === 'object' && Object.keys(records).length > 0) {
+            var firstIdx = getSelectedEmployeeIndex();
+            localStorage.setItem(STORAGE_KEY_TIMECARD + '_' + firstIdx, oldData);
+          }
+          localStorage.setItem('timecard_migrated', '1');
+        }
+      } catch (e) {}
+    }
+
+    function getTodayKey() {
+      var d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    window.clockIn = function() {
+      var records = getTimecardRecords();
+      var todayKey = getTodayKey();
+      if (!records[todayKey]) records[todayKey] = [];
+      
+      // 最後の記録を確認
+      var lastRecord = records[todayKey].length > 0 ? records[todayKey][records[todayKey].length - 1] : null;
+      
+      // 最後の記録が「出勤」の場合は記録しない
+      if (lastRecord && lastRecord.type === '出勤') {
+        showTimecardStatusTemporary('⚠ 既に出勤済みです。次は「退勤」を押してください。');
+        return;
+      }
+      
+      var now = new Date();
+      var timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      records[todayKey].push({ type: '出勤', time: timeStr, timestamp: now.getTime() });
+      saveTimecardRecords(records);
+      if (typeof window.loadTodayRecords === 'function') {
+        window.loadTodayRecords();
+      }
+      if (typeof updateTimecardSummary === 'function') {
+        updateTimecardSummary();
+      }
+      showTimecardStatusTemporary('出勤記録しました: ' + timeStr);
+    };
+
+    window.clockOut = function() {
+      var records = getTimecardRecords();
+      var todayKey = getTodayKey();
+      if (!records[todayKey]) records[todayKey] = [];
+      
+      // 最後の記録を確認
+      var lastRecord = records[todayKey].length > 0 ? records[todayKey][records[todayKey].length - 1] : null;
+      
+      // 最後の記録が「退勤」の場合は記録しない
+      if (lastRecord && lastRecord.type === '退勤') {
+        showTimecardStatusTemporary('⚠ 既に退勤済みです。次は「出勤」を押してください。');
+        return;
+      }
+      
+      // 退勤は「出勤」または「休憩終了」の後にのみ記録可能
+      if (!lastRecord || (lastRecord.type !== '出勤' && lastRecord.type !== '休憩終了')) {
+        showTimecardStatusTemporary('⚠ 先に「出勤」を記録してください。');
+        return;
+      }
+      
+      var now = new Date();
+      var timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      records[todayKey].push({ type: '退勤', time: timeStr, timestamp: now.getTime() });
+      saveTimecardRecords(records);
+      if (typeof window.loadTodayRecords === 'function') {
+        window.loadTodayRecords();
+      }
+      if (typeof updateTimecardSummary === 'function') {
+        updateTimecardSummary();
+      }
+      showTimecardStatusTemporary('退勤記録しました: ' + timeStr);
+    };
+
+    window.breakStart = function() {
+      var records = getTimecardRecords();
+      var todayKey = getTodayKey();
+      if (!records[todayKey]) records[todayKey] = [];
+      
+      // 最後の記録を確認
+      var lastRecord = records[todayKey].length > 0 ? records[todayKey][records[todayKey].length - 1] : null;
+      
+      // 最後の記録が「休憩開始」の場合は記録しない
+      if (lastRecord && lastRecord.type === '休憩開始') {
+        showTimecardStatusTemporary('⚠ 既に休憩開始済みです。次は「休憩終了」を押してください。');
+        return;
+      }
+      
+      // 休憩開始は「出勤」の後にのみ記録可能
+      if (!lastRecord || lastRecord.type !== '出勤') {
+        showTimecardStatusTemporary('⚠ 先に「出勤」を記録してください。');
+        return;
+      }
+      
+      var now = new Date();
+      var timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      records[todayKey].push({ type: '休憩開始', time: timeStr, timestamp: now.getTime() });
+      saveTimecardRecords(records);
+      if (typeof window.loadTodayRecords === 'function') {
+        window.loadTodayRecords();
+      }
+      if (typeof updateTimecardSummary === 'function') {
+        updateTimecardSummary();
+      }
+      showTimecardStatusTemporary('休憩開始: ' + timeStr);
+    };
+
+    window.breakEnd = function() {
+      var records = getTimecardRecords();
+      var todayKey = getTodayKey();
+      if (!records[todayKey]) records[todayKey] = [];
+      
+      // 最後の記録を確認
+      var lastRecord = records[todayKey].length > 0 ? records[todayKey][records[todayKey].length - 1] : null;
+      
+      // 最後の記録が「休憩終了」の場合は記録しない
+      if (lastRecord && lastRecord.type === '休憩終了') {
+        showTimecardStatusTemporary('⚠ 既に休憩終了済みです。次は「休憩開始」を押してください。');
+        return;
+      }
+      
+      // 記録がなく、最初が休憩終了の場合も警告
+      if (!lastRecord || lastRecord.type !== '休憩開始') {
+        showTimecardStatusTemporary('⚠ 先に「休憩開始」を記録してください。');
+        return;
+      }
+      
+      var now = new Date();
+      var timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      records[todayKey].push({ type: '休憩終了', time: timeStr, timestamp: now.getTime() });
+      saveTimecardRecords(records);
+      if (typeof window.loadTodayRecords === 'function') {
+        window.loadTodayRecords();
+      }
+      if (typeof updateTimecardSummary === 'function') {
+        updateTimecardSummary();
+      }
+      showTimecardStatusTemporary('休憩終了: ' + timeStr);
+    };
+
+    window.loadTodayRecords = function() {
+      var records = getTimecardRecords();
+      var todayKey = getTodayKey();
+      var todayRecords = records[todayKey] || [];
+      var container = document.getElementById('todayRecords');
+      if (!container) return;
+      if (todayRecords.length === 0) {
+        container.innerHTML = '<p style="text-align:center;color:#999;padding:20px;">本日の記録はありません</p>';
+        return;
+      }
+      container.innerHTML = '';
+      // タイムスタンプ順にソート（これで出勤→退勤→出勤→退勤の順序になる）
+      todayRecords.sort(function(a, b) {
+        return a.timestamp - b.timestamp;
+      });
+      for (var i = 0; i < todayRecords.length; i++) {
+        var record = todayRecords[i];
+        var index = i;
+        var div = document.createElement('div');
+        div.className = 'timecard-record';
+        div.id = 'record-' + todayKey + '-' + index;
+        div.innerHTML = 
+          '<div><span class="record-type">' + record.type + '</span></div>' +
+          '<div style="display:flex;align-items:center;gap:12px;">' +
+          '<div class="record-time" id="time-' + todayKey + '-' + index + '">' + record.time + '</div>' +
+          '<div class="record-actions" id="actions-' + todayKey + '-' + index + '">' +
+          '<button class="btn-edit" onclick="editRecord(\'' + todayKey + '\', ' + index + ')">編集</button>' +
+          '<button class="btn-delete" onclick="deleteRecord(\'' + todayKey + '\', ' + index + ')">削除</button>' +
+          '</div>' +
+          '</div>';
+        container.appendChild(div);
+      }
+    };
+
+    window.editRecord = function(dateKey, index) {
+      var records = getTimecardRecords();
+      var dayRecords = records[dateKey] || [];
+      if (!dayRecords[index]) return;
+      
+      var record = dayRecords[index];
+      var recordDiv = document.getElementById('record-' + dateKey + '-' + index);
+      var timeDiv = document.getElementById('time-' + dateKey + '-' + index);
+      var actionsDiv = document.getElementById('actions-' + dateKey + '-' + index);
+      
+      recordDiv.classList.add('editing');
+      var timeParts = record.time.split(':');
+      var hour = timeParts[0];
+      var minute = timeParts[1];
+      
+      timeDiv.innerHTML = '<input type="time" class="time-input" id="edit-time-' + dateKey + '-' + index + '" value="' + hour + ':' + minute + '">';
+      actionsDiv.innerHTML = 
+        '<button class="btn-save" onclick="saveRecord(\'' + dateKey + '\', ' + index + ')">保存</button>' +
+        '<button class="btn-cancel" onclick="cancelEdit(\'' + dateKey + '\', ' + index + ')">キャンセル</button>';
+    }
+
+    window.saveRecord = function(dateKey, index) {
+      var records = getTimecardRecords();
+      var dayRecords = records[dateKey] || [];
+      if (!dayRecords[index]) return;
+      
+      var timeInput = document.getElementById('edit-time-' + dateKey + '-' + index);
+      if (!timeInput) return;
+      
+      var newTime = timeInput.value;
+      if (!newTime) {
+        alert('時刻を入力してください。');
+        return;
+      }
+      
+      var timeParts = newTime.split(':');
+      var hour = parseInt(timeParts[0]);
+      var minute = parseInt(timeParts[1]);
+      
+      if (isNaN(hour) || isNaN(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+        alert('正しい時刻を入力してください。');
+        return;
+      }
+      
+      var timeStr = String(hour).padStart(2, '0') + ':' + String(minute).padStart(2, '0');
+      
+      var record = dayRecords[index];
+      record.time = timeStr;
+      
+      var d = new Date();
+      d.setHours(hour);
+      d.setMinutes(minute);
+      d.setSeconds(0);
+      d.setMilliseconds(0);
+      record.timestamp = d.getTime();
+      
+      dayRecords[index] = record;
+      records[dateKey] = dayRecords;
+      saveTimecardRecords(records);
+      
+      if (typeof window.loadTodayRecords === 'function') {
+        window.loadTodayRecords();
+      }
+      if (typeof updateTimecardSummary === 'function') {
+        updateTimecardSummary();
+      }
+      showTimecardStatusTemporary(record.type + 'の時刻を修正しました: ' + timeStr);
+    }
+
+    window.cancelEdit = function(dateKey, index) {
+      if (typeof window.loadTodayRecords === 'function') {
+        window.loadTodayRecords();
+      }
+    };
+
+    window.deleteRecord = function(dateKey, index) {
+      if (!confirm('この記録を削除しますか？')) return;
+      
+      var records = getTimecardRecords();
+      var dayRecords = records[dateKey] || [];
+      if (!dayRecords[index]) return;
+      
+      var record = dayRecords[index];
+      dayRecords.splice(index, 1);
+      
+      if (dayRecords.length === 0) {
+        delete records[dateKey];
+      } else {
+        records[dateKey] = dayRecords;
+      }
+      
+      saveTimecardRecords(records);
+      if (typeof window.loadTodayRecords === 'function') {
+        window.loadTodayRecords();
+      }
+      if (typeof updateTimecardSummary === 'function') {
+        updateTimecardSummary();
+      }
+      showTimecardStatusTemporary(record.type + 'の記録を削除しました。');
+    }
+
+    // 15分間隔に丸める関数
+    function roundTo15Minutes(minutes) {
+      return Math.round(minutes / 15) * 15;
+    }
+
+    function calculateTodayWorkTime() {
+      var records = getTimecardRecords();
+      var todayKey = getTodayKey();
+      var todayRecords = records[todayKey] || [];
+      if (todayRecords.length === 0) return { workMinutes: 0, breakMinutes: 0, overtimeMinutes: 0 };
+      
+      todayRecords.sort(function(a, b) { return a.timestamp - b.timestamp; });
+      var workMinutes = 0;
+      var breakMinutes = 0;
+      var lastClockIn = null;
+      var lastBreakStart = null;
+
+      for (var i = 0; i < todayRecords.length; i++) {
+        var record = todayRecords[i];
+        var timeParts = record.time.split(':');
+        var recordMinutes = parseInt(timeParts[0]) * 60 + parseInt(timeParts[1]);
+
+        if (record.type === '出勤') {
+          lastClockIn = recordMinutes;
+        } else if (record.type === '退勤' && lastClockIn !== null) {
+          var rawMinutes = recordMinutes - lastClockIn;
+          workMinutes += roundTo15Minutes(rawMinutes);
+          lastClockIn = null;
+        } else if (record.type === '休憩開始') {
+          lastBreakStart = recordMinutes;
+        } else if (record.type === '休憩終了' && lastBreakStart !== null) {
+          var rawBreakMinutes = recordMinutes - lastBreakStart;
+          breakMinutes += roundTo15Minutes(rawBreakMinutes);
+          lastBreakStart = null;
+        }
+      }
+
+      var breakMode = document.getElementById('breakTimeMode') ? document.getElementById('breakTimeMode').value : 'manual';
+      if (breakMode === 'fixed') {
+        var fixedBreak = parseInt(document.getElementById('breakTimeFixed').value) || 0;
+        breakMinutes = roundTo15Minutes(fixedBreak);
+      } else if (breakMode === 'auto') {
+        var totalWorkHours = workMinutes / 60;
+        if (totalWorkHours > 8) {
+          breakMinutes = 60;
+        } else if (totalWorkHours > 6) {
+          breakMinutes = 45;
+        } else {
+          breakMinutes = 0;
+        }
+      }
+
+      var netWorkMinutes = Math.max(0, workMinutes - breakMinutes);
+      var dailyHours = parseFloat(document.getElementById('timecardDailyHours') ? document.getElementById('timecardDailyHours').value : 8) || 8;
+      var scheduledMinutes = dailyHours * 60;
+      var overtimeMinutes = Math.max(0, netWorkMinutes - scheduledMinutes);
+      
+      // 最終的な結果も15分間隔に丸める
+      netWorkMinutes = roundTo15Minutes(netWorkMinutes);
+      overtimeMinutes = roundTo15Minutes(overtimeMinutes);
+
+      return { workMinutes: netWorkMinutes, breakMinutes: breakMinutes, overtimeMinutes: overtimeMinutes };
+    }
+
+    function updateTimecardSummary() {
+      var today = calculateTodayWorkTime();
+      var workHours = Math.floor(today.workMinutes / 60);
+      var workMins = today.workMinutes % 60;
+      setText('todayWorkHours', workHours + '時間' + (workMins > 0 ? workMins + '分' : ''));
+      setText('todayBreakTime', today.breakMinutes + '分');
+
+      if (today.overtimeMinutes > 0) {
+        var otHours = Math.floor(today.overtimeMinutes / 60);
+        var otMins = today.overtimeMinutes % 60;
+        setText('todayOvertimeHours', otHours + '時間' + (otMins > 0 ? otMins + '分' : ''));
+        var otItem = document.getElementById('todayOvertimeItem');
+        if (otItem) otItem.style.display = '';
+      } else {
+        var otItem = document.getElementById('todayOvertimeItem');
+        if (otItem) otItem.style.display = 'none';
+      }
+
+      var month = calculateMonthSummary();
+      var monthWorkHours = Math.floor(month.totalMinutes / 60);
+      var monthWorkMins = month.totalMinutes % 60;
+      setText('monthWorkHours', monthWorkHours + '時間' + (monthWorkMins > 0 ? monthWorkMins + '分' : ''));
+      setText('monthWorkDays', month.workDays + '日');
+
+      if (month.overtimeMinutes > 0) {
+        var monthOtHours = Math.floor(month.overtimeMinutes / 60);
+        var monthOtMins = month.overtimeMinutes % 60;
+        setText('monthOvertimeHours', monthOtHours + '時間' + (monthOtMins > 0 ? monthOtMins + '分' : ''));
+        var monthOtItem = document.getElementById('monthOvertimeItem');
+        if (monthOtItem) monthOtItem.style.display = '';
+      } else {
+        var monthOtItem = document.getElementById('monthOvertimeItem');
+        if (monthOtItem) monthOtItem.style.display = 'none';
+      }
+
+      updateMonthlyWorkList();
+    }
+
+    function updateMonthlyWorkList() {
+      var container = document.getElementById('monthlyWorkList');
+      if (!container) return;
+
+      var records = getTimecardRecords();
+      var now = new Date();
+      var year = now.getFullYear();
+      var month = now.getMonth() + 1;
+      var dailyHours = parseFloat(document.getElementById('timecardDailyHours') ? document.getElementById('timecardDailyHours').value : 8) || 8;
+      var scheduledMinutes = dailyHours * 60;
+
+      // 今月の日付リストを作成
+      var daysInMonth = new Date(year, month, 0).getDate();
+      var monthlyData = [];
+
+      for (var day = 1; day <= daysInMonth; day++) {
+        var dateKey = year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+        var dayRecords = records[dateKey] || [];
+        var dayWork = { workMinutes: 0, overtimeMinutes: 0, hasWork: false };
+
+        if (dayRecords.length > 0) {
+          dayWork = calculateDayWorkTime(dayRecords, scheduledMinutes);
+          dayWork.hasWork = dayWork.workMinutes > 0;
+        }
+
+        var dateObj = new Date(year, month - 1, day);
+        var dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][dateObj.getDay()];
+        monthlyData.push({
+          date: day,
+          dayOfWeek: dayOfWeek,
+          workMinutes: dayWork.workMinutes,
+          overtimeMinutes: dayWork.overtimeMinutes,
+          hasWork: dayWork.hasWork,
+          clockInTimes: dayWork.clockInTimes || [],
+          clockOutTimes: dayWork.clockOutTimes || [],
+          breakPeriods: dayWork.breakPeriods || []
+        });
+      }
+
+      // テーブルを生成
+      var html = '<table class="monthly-work-table">';
+      html += '<thead><tr><th>日付</th><th>曜日</th><th>出勤時刻</th><th>退勤時刻</th><th>休憩時間</th><th>就業時間</th><th>残業時間</th></tr></thead>';
+      html += '<tbody>';
+
+      for (var i = 0; i < monthlyData.length; i++) {
+        var data = monthlyData[i];
+        var rowClass = data.hasWork ? '' : 'style="color:#999;"';
+        var workHours = Math.floor(data.workMinutes / 60);
+        var workMins = data.workMinutes % 60;
+        var workTimeStr = data.hasWork ? (workHours + '時間' + (workMins > 0 ? workMins + '分' : '')) : '-';
+        
+        var otHours = Math.floor(data.overtimeMinutes / 60);
+        var otMins = data.overtimeMinutes % 60;
+        var overtimeStr = data.overtimeMinutes > 0 ? (otHours + '時間' + (otMins > 0 ? otMins + '分' : '')) : '-';
+        
+        // 出勤時刻・退勤時刻・休憩時間を表示（編集可能に）
+        var dateKey = year + '-' + String(month).padStart(2, '0') + '-' + String(data.date).padStart(2, '0');
+        var dayNum = data.date;
+        var clockInStr = '-';
+        var clockOutStr = '-';
+        var breakStr = '-';
+        
+        if (data.hasWork && data.clockInTimes && data.clockInTimes.length > 0) {
+          clockInStr = data.clockInTimes.map(function(time, idx) {
+            return '<span class="editable-time" title="クリックして編集" onclick="editMonthlyTime(\'' + dateKey + '\', \'出勤\', ' + idx + ')">' + time + '</span>';
+          }).join('<br>');
+        }
+        
+        if (data.hasWork && data.clockOutTimes && data.clockOutTimes.length > 0) {
+          clockOutStr = data.clockOutTimes.map(function(time, idx) {
+            return '<span class="editable-time" title="クリックして編集" onclick="editMonthlyTime(\'' + dateKey + '\', \'退勤\', ' + idx + ')">' + time + '</span>';
+          }).join('<br>');
+        }
+        
+        if (data.hasWork && data.breakPeriods && data.breakPeriods.length > 0) {
+          breakStr = data.breakPeriods.map(function(period, idx) {
+            return '<span class="editable-time" title="クリックして編集" onclick="editMonthlyBreak(\'' + dateKey + '\', ' + idx + ')">' + period + '</span>';
+          }).join('<br>');
+        }
+
+        html += '<tr ' + rowClass + '>';
+        html += '<td>' + data.date + '日</td>';
+        html += '<td>' + data.dayOfWeek + '</td>';
+        html += '<td style="text-align:left;padding-left:4px;font-size:12px;">' + clockInStr + '</td>';
+        html += '<td style="text-align:left;padding-left:4px;font-size:12px;">' + clockOutStr + '</td>';
+        html += '<td style="text-align:left;padding-left:4px;font-size:12px;">' + breakStr + '</td>';
+        html += '<td class="work-hours">' + workTimeStr + '</td>';
+        html += '<td class="overtime-hours">' + overtimeStr + '</td>';
+        html += '</tr>';
+      }
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+    
+    // 月間勤務一覧での時刻編集機能
+    window.editMonthlyTime = function(dateKey, type, index) {
+      var records = getTimecardRecords();
+      var dayRecords = records[dateKey] || [];
+      if (!dayRecords || dayRecords.length === 0) return;
+      
+      // 該当するタイプの記録を探す
+      var targetRecords = [];
+      for (var i = 0; i < dayRecords.length; i++) {
+        if (dayRecords[i].type === type) {
+          targetRecords.push({ record: dayRecords[i], originalIndex: i });
+        }
+      }
+      
+      if (!targetRecords[index]) {
+        alert('記録が見つかりません。');
+        return;
+      }
+      
+      var targetRecord = targetRecords[index];
+      var currentTime = targetRecord.record.time;
+      var newTime = prompt(type + 'の時刻を入力してください（HH:MM形式）:', currentTime);
+      
+      if (!newTime || newTime === currentTime) return;
+      
+      // 時刻形式を検証
+      var timePattern = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+      if (!timePattern.test(newTime)) {
+        alert('正しい時刻形式（HH:MM）で入力してください。');
+        return;
+      }
+      
+      // 記録を更新
+      var recordIndex = targetRecord.originalIndex;
+      dayRecords[recordIndex].time = newTime;
+      
+      // タイムスタンプを更新
+      var timeParts = newTime.split(':');
+      var hour = parseInt(timeParts[0]);
+      var minute = parseInt(timeParts[1]);
+      var d = new Date();
+      d.setHours(hour);
+      d.setMinutes(minute);
+      d.setSeconds(0);
+      d.setMilliseconds(0);
+      // 日付部分は元のタイムスタンプから取得
+      var originalDate = new Date(dayRecords[recordIndex].timestamp);
+      d.setFullYear(originalDate.getFullYear());
+      d.setMonth(originalDate.getMonth());
+      d.setDate(originalDate.getDate());
+      dayRecords[recordIndex].timestamp = d.getTime();
+      
+      records[dateKey] = dayRecords;
+      saveTimecardRecords(records);
+      
+      // 表示を更新
+      if (typeof updateTimecardSummary === 'function') {
+        updateTimecardSummary();
+      }
+      if (typeof updateMonthlyWorkList === 'function') {
+        updateMonthlyWorkList();
+      }
+      if (typeof window.loadTodayRecords === 'function') {
+        window.loadTodayRecords();
+      }
+    };
+    
+    window.editMonthlyBreak = function(dateKey, breakIndex) {
+      var records = getTimecardRecords();
+      var dayRecords = records[dateKey] || [];
+      if (!dayRecords || dayRecords.length === 0) return;
+      
+      // 休憩開始・休憩終了のペアを探す
+      var breakPairs = [];
+      var lastBreakStart = null;
+      var pairIndex = 0;
+      
+      for (var i = 0; i < dayRecords.length; i++) {
+        if (dayRecords[i].type === '休憩開始') {
+          lastBreakStart = { record: dayRecords[i], index: i };
+        } else if (dayRecords[i].type === '休憩終了' && lastBreakStart !== null) {
+          breakPairs.push({
+            start: lastBreakStart.record,
+            end: dayRecords[i],
+            startIndex: lastBreakStart.index,
+            endIndex: i
+          });
+          lastBreakStart = null;
+        }
+      }
+      
+      if (!breakPairs[breakIndex]) {
+        alert('休憩記録が見つかりません。');
+        return;
+      }
+      
+      var pair = breakPairs[breakIndex];
+      var currentPeriod = pair.start.time + '～' + pair.end.time;
+      var newPeriod = prompt('休憩時間を入力してください（開始時刻～終了時刻、例: 12:00～13:00）:', currentPeriod);
+      
+      if (!newPeriod || newPeriod === currentPeriod) return;
+      
+      var parts = newPeriod.split('～');
+      if (parts.length !== 2) {
+        alert('正しい形式（開始時刻～終了時刻）で入力してください。');
+        return;
+      }
+      
+      var startTime = parts[0].trim();
+      var endTime = parts[1].trim();
+      var timePattern = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+      
+      if (!timePattern.test(startTime) || !timePattern.test(endTime)) {
+        alert('正しい時刻形式（HH:MM）で入力してください。');
+        return;
+      }
+      
+      // 記録を更新
+      dayRecords[pair.startIndex].time = startTime;
+      dayRecords[pair.endIndex].time = endTime;
+      
+      // タイムスタンプを更新
+      var startParts = startTime.split(':');
+      var endParts = endTime.split(':');
+      var startHour = parseInt(startParts[0]);
+      var startMinute = parseInt(startParts[1]);
+      var endHour = parseInt(endParts[0]);
+      var endMinute = parseInt(endParts[1]);
+      
+      var originalStartDate = new Date(dayRecords[pair.startIndex].timestamp);
+      var originalEndDate = new Date(dayRecords[pair.endIndex].timestamp);
+      
+      var startD = new Date();
+      startD.setFullYear(originalStartDate.getFullYear());
+      startD.setMonth(originalStartDate.getMonth());
+      startD.setDate(originalStartDate.getDate());
+      startD.setHours(startHour);
+      startD.setMinutes(startMinute);
+      startD.setSeconds(0);
+      startD.setMilliseconds(0);
+      
+      var endD = new Date();
+      endD.setFullYear(originalEndDate.getFullYear());
+      endD.setMonth(originalEndDate.getMonth());
+      endD.setDate(originalEndDate.getDate());
+      endD.setHours(endHour);
+      endD.setMinutes(endMinute);
+      endD.setSeconds(0);
+      endD.setMilliseconds(0);
+      
+      dayRecords[pair.startIndex].timestamp = startD.getTime();
+      dayRecords[pair.endIndex].timestamp = endD.getTime();
+      
+      records[dateKey] = dayRecords;
+      saveTimecardRecords(records);
+      
+      // 表示を更新
+      if (typeof updateTimecardSummary === 'function') {
+        updateTimecardSummary();
+      }
+      if (typeof updateMonthlyWorkList === 'function') {
+        updateMonthlyWorkList();
+      }
+      if (typeof window.loadTodayRecords === 'function') {
+        window.loadTodayRecords();
+      }
+    };
+
+    function calculateMonthSummary() {
+      var records = getTimecardRecords();
+      var now = new Date();
+      var year = now.getFullYear();
+      var month = now.getMonth() + 1;
+      var totalMinutes = 0;
+      var overtimeMinutes = 0;
+      var workDays = 0;
+      var dailyHours = parseFloat(document.getElementById('timecardDailyHours') ? document.getElementById('timecardDailyHours').value : 8) || 8;
+      var scheduledMinutes = dailyHours * 60;
+
+      for (var key in records) {
+        if (key.startsWith(year + '-' + String(month).padStart(2, '0') + '-')) {
+          var dayRecords = records[key];
+          if (dayRecords && dayRecords.length > 0) {
+            var dayWork = calculateDayWorkTime(dayRecords, scheduledMinutes);
+            if (dayWork.workMinutes > 0) {
+              totalMinutes += dayWork.workMinutes;
+              overtimeMinutes += dayWork.overtimeMinutes;
+              workDays++;
+            }
+          }
+        }
+      }
+
+      return { totalMinutes: totalMinutes, overtimeMinutes: overtimeMinutes, workDays: workDays };
+    }
+
+    function calculateDayWorkTime(dayRecords, scheduledMinutes) {
+      dayRecords.sort(function(a, b) { return a.timestamp - b.timestamp; });
+      var workMinutes = 0;
+      var breakMinutes = 0;
+      var lastClockIn = null;
+      var lastBreakStart = null;
+      
+      // 出勤時刻・退勤時刻・休憩時間の詳細を記録
+      var clockInTimes = [];
+      var clockOutTimes = [];
+      var breakPeriods = [];
+
+      for (var i = 0; i < dayRecords.length; i++) {
+        var record = dayRecords[i];
+        var timeParts = record.time.split(':');
+        var recordMinutes = parseInt(timeParts[0]) * 60 + parseInt(timeParts[1]);
+
+        if (record.type === '出勤') {
+          lastClockIn = recordMinutes;
+          clockInTimes.push(record.time);
+        } else if (record.type === '退勤' && lastClockIn !== null) {
+          var rawMinutes = recordMinutes - lastClockIn;
+          workMinutes += roundTo15Minutes(rawMinutes);
+          clockOutTimes.push(record.time);
+          lastClockIn = null;
+        } else if (record.type === '休憩開始') {
+          lastBreakStart = record.time; // 時刻文字列を保存
+        } else if (record.type === '休憩終了' && lastBreakStart !== null) {
+          breakPeriods.push(lastBreakStart + '～' + record.time);
+          var breakStartParts = lastBreakStart.split(':');
+          var breakStartMins = parseInt(breakStartParts[0]) * 60 + parseInt(breakStartParts[1]);
+          var rawBreakMinutes = recordMinutes - breakStartMins;
+          breakMinutes += roundTo15Minutes(rawBreakMinutes);
+          lastBreakStart = null;
+        }
+      }
+
+      var breakMode = document.getElementById('breakTimeMode') ? document.getElementById('breakTimeMode').value : 'manual';
+      if (breakMode === 'fixed') {
+        var fixedBreak = parseInt(document.getElementById('breakTimeFixed').value) || 0;
+        breakMinutes = roundTo15Minutes(fixedBreak);
+      } else if (breakMode === 'auto') {
+        var totalWorkHours = workMinutes / 60;
+        if (totalWorkHours > 8) {
+          breakMinutes = 60;
+        } else if (totalWorkHours > 6) {
+          breakMinutes = 45;
+        } else {
+          breakMinutes = 0;
+        }
+      }
+
+      var netWorkMinutes = Math.max(0, workMinutes - breakMinutes);
+      var overtimeMinutes = Math.max(0, netWorkMinutes - scheduledMinutes);
+      
+      // 最終的な結果も15分間隔に丸める
+      netWorkMinutes = roundTo15Minutes(netWorkMinutes);
+      overtimeMinutes = roundTo15Minutes(overtimeMinutes);
+
+      return { 
+        workMinutes: netWorkMinutes, 
+        breakMinutes: breakMinutes, 
+        overtimeMinutes: overtimeMinutes,
+        clockInTimes: clockInTimes,
+        clockOutTimes: clockOutTimes,
+        breakPeriods: breakPeriods
+      };
+    }
+
+    window.updateBreakTimeMode = function() {
+      var mode = document.getElementById('breakTimeMode').value;
+      var fixedField = document.getElementById('breakTimeFixedField');
+      if (fixedField) {
+        fixedField.style.display = mode === 'fixed' ? '' : 'none';
+      }
+      updateTimecardSummary();
+    };
+
+    window.syncToPayslip = function() {
+      var month = calculateMonthSummary();
+      var dailyHours = parseFloat(document.getElementById('timecardDailyHours') ? document.getElementById('timecardDailyHours').value : 8) || 8;
+      var scheduledDays = parseInt(document.getElementById('timecardScheduledDays') ? document.getElementById('timecardScheduledDays').value : 22) || 22;
+      
+      var workHours = month.totalMinutes / 60;
+      var overtimeHours = month.overtimeMinutes / 60;
+      var workedDays = month.workDays;
+
+      var idx = getSelectedEmployeeIndex();
+      var empKey = STORAGE_KEY_EMPLOYEE_PREFIX + idx;
+      try {
+        var empJson = localStorage.getItem(empKey);
+        var empO = empJson ? JSON.parse(empJson) : {};
+        empO.workedDays = workedDays;
+        empO.workedHours = workHours.toFixed(2);
+        empO.dailyScheduledHours = dailyHours;
+        empO.scheduledDays = scheduledDays;
+        localStorage.setItem(empKey, JSON.stringify(empO));
+        
+        setVal('workedDays', workedDays);
+        setVal('workedHours', workHours.toFixed(2));
+        setVal('dailyScheduledHours', dailyHours);
+        setVal('scheduledDays', scheduledDays);
+        
+        loadCurrentEmployeeToForm(idx);
+        recalculate();
+        alert('タイムカードのデータを給与明細書に反映しました。');
+        if (typeof switchTab === 'function') {
+          switchTab('payslip');
+        }
+      } catch (e) {
+        alert('データの反映に失敗しました。');
+      }
+    };
+
+    /* ===== 初期化 ===== */
+    (function init() {
+      var sel = document.getElementById('employeeSelect');
+      if (sel) {
+        var list = getEmployeeList();
+        for (var i = 0; i < list.length; i++) {
+          if (isEmployeeHidden(i)) continue;
+          var e = getEmployeeMaster(i);
+          if (!e) continue;
+          var opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = e.empNo + ' ' + e.name + '（' + (e.dept || '') + '）';
+          sel.appendChild(opt);
+        }
+        sel.addEventListener('change', onEmployeeChange);
+      }
+      initPrintTargetCheckboxes();
+      refreshWorkplaceSelect();
+      loadSettings();
+      migrateOldTimecardData();
+      if (!str('periodMonth')) setVal('periodMonth', getDefaultPeriodMonth());
+      if (!str('payDate')) setVal('payDate', getDefaultPayDate());
+      updateCompanyDisplay();
+      loadCurrentEmployeeToForm(getSelectedEmployeeIndex());
+      updatePayslipEmployeeDisplay();
+      updateTimecardEmployeeName();
+      initTimecardEmployeeSelect();
+      updateAdminUI();
+      recalculate();
+      renderDeletedEmployeeList();
+
+      var wpSel = document.getElementById('editEmpWorkplace');
+      if (wpSel) wpSel.addEventListener('change', function() { scheduleRecalc(); scheduleSave(); });
+
+      var hireDateEl = document.getElementById('editEmpHireDate');
+      if (hireDateEl) hireDateEl.addEventListener('change', function() {
+        var v = hireDateEl.value.trim();
+        var autoDays = v ? getPaidLeaveFromHireDate(v) : null;
+        var autoEl = document.getElementById('editEmpPaidLeaveAuto');
+        if (autoEl) autoEl.value = autoDays != null ? '（入社日から）' + autoDays + ' 日' : '－';
+      });
+
+      var birthDateEl = document.getElementById('editEmpBirthDate');
+      if (birthDateEl) birthDateEl.addEventListener('change', function() {
+        scheduleRecalc();
+      });
+
+      // タイムカードタブを確実に表示（直接操作）
+      var timecardTab = document.getElementById('tab-timecard');
+      var payslipTab = document.getElementById('tab-payslip');
+      var settingsTab = document.getElementById('tab-settings');
+      var timecardBtn = document.querySelectorAll('.tab-button')[0];
+      var payslipBtn = document.querySelectorAll('.tab-button')[1];
+      var settingsBtn = document.querySelectorAll('.tab-button')[2];
+      
+      if (timecardTab) timecardTab.classList.add('active');
+      if (payslipTab) payslipTab.classList.remove('active');
+      if (settingsTab) settingsTab.classList.remove('active');
+      if (timecardBtn) timecardBtn.classList.add('active');
+      if (payslipBtn) payslipBtn.classList.remove('active');
+      if (settingsBtn) settingsBtn.classList.remove('active');
+      
+      // 時計を即座に開始（直接実行）
+      setTimeout(function() {
+        startTimecardClockNow();
+      }, 100);
+      
+      // タイムカードデータを読み込み
+      if (typeof loadTodayRecords === 'function') {
+        loadTodayRecords();
+      }
+      if (typeof updateTimecardSummary === 'function') {
+        updateTimecardSummary();
+      }
+      if (typeof updateMonthlyWorkList === 'function') {
+        updateMonthlyWorkList();
+      }
+    })();
+    
+    // ページ読み込み完了時に確実に初期化
+    function initializeTimecard() {
+      // 時計を確実に開始（直接実装）
+      var dateEl = document.getElementById('timecardDate');
+      var timeEl = document.getElementById('timecardTime');
+      if (dateEl && timeEl) {
+        function updateClock() {
+          var now = new Date();
+          var year = now.getFullYear();
+          var month = now.getMonth() + 1;
+          var day = now.getDate();
+          var hours = now.getHours();
+          var minutes = now.getMinutes();
+          var seconds = now.getSeconds();
+          
+          dateEl.textContent = year + '年' + month + '月' + day + '日';
+          timeEl.textContent = 
+            (hours < 10 ? '0' : '') + hours + ':' + 
+            (minutes < 10 ? '0' : '') + minutes + ':' + 
+            (seconds < 10 ? '0' : '') + seconds;
+        }
+        updateClock();
+        if (window.timecardClockInterval) {
+          clearInterval(window.timecardClockInterval);
+        }
+        window.timecardClockInterval = setInterval(updateClock, 1000);
+      }
+      
+      // タブを確実に表示
+      var timecardTab = document.getElementById('tab-timecard');
+      var payslipTab = document.getElementById('tab-payslip');
+      var settingsTab = document.getElementById('tab-settings');
+      var buttons = document.querySelectorAll('.tab-button');
+      
+      if (timecardTab) {
+        // すべてのタブを非表示
+        if (timecardTab) timecardTab.style.display = 'none';
+        if (payslipTab) payslipTab.style.display = 'none';
+        if (settingsTab) settingsTab.style.display = 'none';
+        
+        // タイムカードタブを表示
+        timecardTab.style.display = 'block';
+        timecardTab.classList.add('active');
+        if (payslipTab) payslipTab.classList.remove('active');
+        if (settingsTab) settingsTab.classList.remove('active');
+        if (buttons[0]) buttons[0].classList.add('active');
+        if (buttons[1]) buttons[1].classList.remove('active');
+        if (buttons[2]) buttons[2].classList.remove('active');
+      }
+    }
+    
+    // 複数のタイミングで初期化を試行（確実に実行されるように）
+    function runInit() {
+      try {
+        initializeTimecard();
+      } catch (e) {
+        console.error('初期化エラー:', e);
+        setTimeout(runInit, 200);
+      }
+    }
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(runInit, 100);
+      });
+    } else {
+      setTimeout(runInit, 100);
+    }
+    window.addEventListener('load', function() {
+      setTimeout(runInit, 200);
+    });
+    
+    // さらに確実にするため、少し遅れて実行
+    setTimeout(runInit, 500);
+  </script>
+  
+  <!-- 最終的な初期化スクリプト（確実に実行されるように） -->
+  <script>
+    (function() {
+      // 時計を開始
+      function startClock() {
+        var dateEl = document.getElementById('timecardDate');
+        var timeEl = document.getElementById('timecardTime');
+        if (dateEl && timeEl) {
+          function update() {
+            var now = new Date();
+            var year = now.getFullYear();
+            var month = now.getMonth() + 1;
+            var day = now.getDate();
+            var hours = now.getHours();
+            var minutes = now.getMinutes();
+            var seconds = now.getSeconds();
+            
+            dateEl.textContent = year + '年' + month + '月' + day + '日';
+            timeEl.textContent = 
+              (hours < 10 ? '0' : '') + hours + ':' + 
+              (minutes < 10 ? '0' : '') + minutes + ':' + 
+              (seconds < 10 ? '0' : '') + seconds;
+          }
+          update();
+          if (window.timecardClockInterval) {
+            clearInterval(window.timecardClockInterval);
+          }
+          window.timecardClockInterval = setInterval(update, 1000);
+          return true;
+        }
+        return false;
+      }
+      
+      // タブを初期化
+      function initTabs() {
+        var timecardTab = document.getElementById('tab-timecard');
+        var payslipTab = document.getElementById('tab-payslip');
+        var settingsTab = document.getElementById('tab-settings');
+        var buttons = document.querySelectorAll('.tab-button');
+        
+        if (timecardTab && buttons.length >= 3) {
+          // すべてのタブを非表示
+          if (timecardTab) {
+            timecardTab.style.display = 'none';
+            timecardTab.classList.remove('active');
+          }
+          if (payslipTab) {
+            payslipTab.style.display = 'none';
+            payslipTab.classList.remove('active');
+          }
+          if (settingsTab) {
+            settingsTab.style.display = 'none';
+            settingsTab.classList.remove('active');
+          }
+          
+          // タイムカードタブを表示
+          timecardTab.style.display = 'block';
+          timecardTab.classList.add('active');
+          buttons[0].classList.add('active');
+          if (buttons[1]) buttons[1].classList.remove('active');
+          if (buttons[2]) buttons[2].classList.remove('active');
+          return true;
+        }
+        return false;
+      }
+      
+      // 複数回試行
+      var tries = 0;
+      function tryInit() {
+        tries++;
+        var clockOk = startClock();
+        var tabsOk = initTabs();
+        
+        if (!clockOk || !tabsOk) {
+          if (tries < 10) {
+            setTimeout(tryInit, 100);
+          }
+        }
+      }
+      
+      // 即座に試行
+      tryInit();
+      
+      // DOMContentLoadedでも試行
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', tryInit);
+      }
+      
+      // window.onloadでも試行
+      window.addEventListener('load', function() {
+        setTimeout(tryInit, 100);
+      });
+    })();
+  </script>
+</body>
+</html>
