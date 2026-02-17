@@ -1320,7 +1320,7 @@
   <div id="tab-settings" class="tab-content" style="display:none">
     <div class="panel">
       <h2>管理者パスワード変更</h2>
-      <p style="margin:0 0 12px 0; color:#666; font-size:13px;">管理者（寺山茂樹）のログインパスワードを変更できます。初期パスワードは「0000」です。</p>
+      <p style="margin:0 0 12px 0; color:#666; font-size:13px;">管理者のログインパスワードを変更できます。初期パスワードは「0000」です。</p>
       <div class="input-grid">
         <div class="field">
           <label>現在のパスワード</label>
@@ -1588,7 +1588,7 @@
     var STORAGE_KEY_TIMECARD_SETTINGS = 'timecard_settings';
     var ADMIN_PASSWORD_KEY = 'payslip_admin_password';
     var DEFAULT_ADMIN_PASSWORD = '0000';
-    var ADMIN_NAME = '寺山茂樹';
+    var ADMIN_NAME = '管理者';
     var isAdminUnlocked = false;
 
     function getAdminPassword() {
@@ -1701,27 +1701,17 @@
     window.changeAdminPassword = changeAdminPassword;
 
     var EMPLOYEES = [
-      { name: '山田 太郎',   empNo: '00001', dept: '総務部',   baseSalary: 280000, commute: 680,  position: 20000, residentTax: 12000, paidLeave: 10 },
-      { name: '佐藤 花子',   empNo: '00002', dept: '総務部',   baseSalary: 260000, commute: 550,  position: 0,     residentTax: 10000, paidLeave: 14 },
-      { name: '鈴木 一郎',   empNo: '00003', dept: '営業部',   baseSalary: 300000, commute: 820,  position: 25000, residentTax: 15000, paidLeave: 8 },
-      { name: '高橋 美咲',   empNo: '00004', dept: '営業部',   baseSalary: 270000, commute: 680,  position: 0,     residentTax: 11000, paidLeave: 12 },
-      { name: '田中 健太',   empNo: '00005', dept: '営業部',   baseSalary: 250000, commute: 460,  position: 0,     residentTax: 8000,  paidLeave: 20 },
-      { name: '伊藤 さくら', empNo: '00006', dept: '開発部',   baseSalary: 320000, commute: 910,  position: 30000, residentTax: 18000, paidLeave: 5 },
-      { name: '渡辺 大輔',   empNo: '00007', dept: '開発部',   baseSalary: 290000, commute: 730,  position: 15000, residentTax: 13000, paidLeave: 9 },
-      { name: '中村 優子',   empNo: '00008', dept: '開発部',   baseSalary: 275000, commute: 640,  position: 0,     residentTax: 12000, paidLeave: 11 },
-      { name: '小林 翔太',   empNo: '00009', dept: '開発部',   baseSalary: 265000, commute: 550,  position: 0,     residentTax: 9000,  paidLeave: 15 },
-      { name: '加藤 あゆみ', empNo: '00010', dept: '開発部',   baseSalary: 255000, commute: 460,  position: 0,     residentTax: 7000,  paidLeave: 18 },
-      { name: '吉田 直樹',   empNo: '00011', dept: '人事部',   baseSalary: 285000, commute: 680,  position: 22000, residentTax: 14000, paidLeave: 7 },
-      { name: '山本 恵子',   empNo: '00012', dept: '人事部',   baseSalary: 268000, commute: 590,  position: 0,     residentTax: 10500, paidLeave: 13 },
-      { name: '松本 拓也',   empNo: '00013', dept: '経理部',   baseSalary: 295000, commute: 770,  position: 28000, residentTax: 16000, paidLeave: 6 },
-      { name: '井上 由美',   empNo: '00014', dept: '経理部',   baseSalary: 272000, commute: 640,  position: 0,     residentTax: 11500, paidLeave: 10 },
-      { name: '木村 浩二',   empNo: '00015', dept: '経理部',   baseSalary: 258000, commute: 500,  position: 0,     residentTax: 8500,  paidLeave: 16 },
-      { name: '林 真由美',   empNo: '00016', dept: '企画部',   baseSalary: 310000, commute: 860,  position: 35000, residentTax: 17000, paidLeave: 4 },
-      { name: '斎藤 誠',     empNo: '00017', dept: '企画部',   baseSalary: 278000, commute: 680,  position: 10000, residentTax: 12500, paidLeave: 8 },
-      { name: '清水 麻衣',   empNo: '00018', dept: '営業部',   baseSalary: 262000, commute: 590,  position: 0,     residentTax: 9500,  paidLeave: 14 },
-      { name: '山口 涼太',   empNo: '00019', dept: '総務部',   baseSalary: 248000, commute: 410,  position: 0,     residentTax: 7500,  paidLeave: 19 },
-      { name: '松田 彩香',   empNo: '00020', dept: '開発部',   baseSalary: 268000, commute: 640,  position: 5000,  residentTax: 10000, paidLeave: 12 },
-      { name: '寺山茂樹',   empNo: '00021', dept: '管理部',   baseSalary: 350000, commute: 800,  position: 50000, residentTax: 20000, paidLeave: 20 }
+      { name: '管理者',  empNo: '00001', dept: '', baseSalary: 0, commute: 0, position: 0, residentTax: 0, paidLeave: 0 },
+      { name: '社員1',   empNo: '00002', dept: '', baseSalary: 0, commute: 0, position: 0, residentTax: 0, paidLeave: 0 },
+      { name: '社員2',   empNo: '00003', dept: '', baseSalary: 0, commute: 0, position: 0, residentTax: 0, paidLeave: 0 },
+      { name: '社員3',   empNo: '00004', dept: '', baseSalary: 0, commute: 0, position: 0, residentTax: 0, paidLeave: 0 },
+      { name: '社員4',   empNo: '00005', dept: '', baseSalary: 0, commute: 0, position: 0, residentTax: 0, paidLeave: 0 },
+      { name: '社員5',   empNo: '00006', dept: '', baseSalary: 0, commute: 0, position: 0, residentTax: 0, paidLeave: 0 },
+      { name: '社員6',   empNo: '00007', dept: '', baseSalary: 0, commute: 0, position: 0, residentTax: 0, paidLeave: 0 },
+      { name: '社員7',   empNo: '00008', dept: '', baseSalary: 0, commute: 0, position: 0, residentTax: 0, paidLeave: 0 },
+      { name: '社員8',   empNo: '00009', dept: '', baseSalary: 0, commute: 0, position: 0, residentTax: 0, paidLeave: 0 },
+      { name: '社員9',   empNo: '00010', dept: '', baseSalary: 0, commute: 0, position: 0, residentTax: 0, paidLeave: 0 },
+      { name: '社員10',  empNo: '00011', dept: '', baseSalary: 0, commute: 0, position: 0, residentTax: 0, paidLeave: 0 }
     ];
 
     /* ===== ユーティリティ ===== */
