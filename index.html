@@ -1059,6 +1059,7 @@
         <select id="employeeSelect" style="padding:10px 12px; font-size:14px;"></select>
       </div>
       <button type="button" class="btn-reset" onclick="addNewEmployee()">＋ 社員を追加</button>
+      <button type="button" class="btn-danger" onclick="deleteCurrentEmployee()">× 選択中の社員を削除</button>
     </div>
     <div id="currentEmployeeLabel" style="margin-bottom:16px; padding:10px 14px; background:#e8f4fd; border-radius:6px; border:1px solid #b8daff; font-size:14px; font-weight:600; color:#0c5460;">
       現在の設定対象: <span id="currentEmployeeName">—</span> さん
@@ -1877,12 +1878,11 @@
         addrInput.style.cssText = 'flex:2;min-width:200px;padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:13px;';
         addrInput.addEventListener('change', (function(ii) { return function() { updateWorkplace(ii, 'address', this.value); }; })(i));
         div.appendChild(addrInput);
-        if (list.length > 1) {
-          var btn = document.createElement('button');
-          btn.type = 'button'; btn.className = 'btn-reset'; btn.textContent = '削除';
-          btn.addEventListener('click', (function(ii) { return function() { removeWorkplace(ii); }; })(i));
-          div.appendChild(btn);
-        }
+        var btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'btn-danger'; btn.textContent = '× 削除';
+        btn.style.cssText = 'padding:6px 12px;font-size:12px;white-space:nowrap;';
+        btn.addEventListener('click', (function(ii) { return function() { removeWorkplace(ii); }; })(i));
+        div.appendChild(btn);
         container.appendChild(div);
       });
     }
